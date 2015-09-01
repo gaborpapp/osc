@@ -543,7 +543,7 @@ namespace osc {
 
 			msg.append( osc().getIdentifier() );
 			msg.append( recipient );
-			msg.append_time_tag( value );
+			msg.appendTimeTag( value );
 
 			return osc().request( msg );
 		}
@@ -564,7 +564,7 @@ namespace osc {
 
 			msg.append( osc().getIdentifier() );
 			msg.append( recipient );
-			msg.append_time_tag( value );
+			msg.appendTimeTag( value );
 
 			return osc().request( msg );
 		}

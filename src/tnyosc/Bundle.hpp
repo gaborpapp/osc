@@ -36,7 +36,7 @@
 #pragma once
 
 #include "utils.h"
-#include "Message.hpp"
+#include "Message.h"
 
 namespace tnyosc {
 	
@@ -63,13 +63,13 @@ public:
 	/// function does not affect this bundle.
 	///
 	/// @param[in] message A pointer to tnyosc::Message.
-	void append( const Message *message ) { append_data( message->byte_array() ); }
+	void append( const Message *message ) { append_data( message->byteArray() ); }
 	
 	/// Appends an OSC bundle to this bundle. The bundle may include any number
 	/// of messages or bundles and are immediately copied into this bundle. Any
 	/// changes to the bundle
 	void append( const Bundle *bundle ) { append_data( bundle->byte_array() ); }
-	void append( const Message &message ) { append_data( message.byte_array() ); }
+	void append( const Message &message ) { append_data( message.byteArray() ); }
 	void append( const Bundle &bundle ) { append_data( bundle.byte_array() ); }
 	
 	/// Sets timestamp of the bundle.

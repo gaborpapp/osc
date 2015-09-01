@@ -71,6 +71,25 @@
 #endif
 
 namespace tnyosc {
+	
+	enum class ArgType {
+		INTEGER_32,
+		FLOAT,
+		DOUBLE,
+		STRING,
+		BLOB,
+		MIDI,
+		TIME_TAG,
+		INTEGER_64,
+		BOOL_T,
+		BOOL_F,
+		CHAR,
+		NULL_T,
+		INFINITUM,
+		NONE
+	};
+	
+	const char* argTypeToString( ArgType type );
 		
 	/// Convert 32-bit float to a big-endian network format
 	inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
@@ -94,4 +113,18 @@ namespace tnyosc {
 		
 		return ( sec << 32 ) + ( usec % 1000000L );
 	}
+	
+	class ExcIndexOutOfBounds : public ci::Exception {
+	public:
+		ExcIndexOutOfBounds( const std::string &address, uint32_t index )
+		: Exception( std::string( std::to_string( index ) + " out of bounds from address, " + address ) )
+		{}
+	};
+	
+	class ExcNonConvertible : public ci::Exception {
+	public:
+		ExcNonConvertible( const std::string &address, uint32_t index, ArgType actualType, ArgType convertToType )
+		: Exception( std::string( std::to_string( index ) + ": " + address ) )
+		{}
+	};
 }

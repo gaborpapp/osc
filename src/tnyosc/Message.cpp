@@ -59,4 +59,26 @@ char Argument::getChar() const
 	}
 }
 	
+template<typename T>
+bool Argument::convertible() const
+{
+	switch ( mType ) {
+		case ArgType::INTEGER_32: return std::is_same<T, int32_t>::value;
+		case ArgType::FLOAT: return std::is_same<T, float>::value;
+		case ArgType::STRING: return std::is_same<T, std::string>::value;
+		case ArgType::BLOB: return std::is_same<T, ci::Buffer>::value;
+		case ArgType::INTEGER_64: return std::is_same<T, int64_t>::value;
+		case ArgType::TIME_TAG: return std::is_same<T, int64_t>::value;
+		case ArgType::DOUBLE: return std::is_same<T, double>::value;
+		case ArgType::CHAR: return std::is_same<T, int32_t>::value;
+		case ArgType::MIDI: return std::is_same<T, int32_t>::value;
+		case ArgType::BOOL_T: return std::is_same<T, bool>::value;
+		case ArgType::BOOL_F: return std::is_same<T, bool>::value;
+		case ArgType::NULL_T: return false;
+		case ArgType::INFINITUM: return false;
+		case ArgType::NONE: return false;
+		default: return false;
+	}
+}
+	
 }
