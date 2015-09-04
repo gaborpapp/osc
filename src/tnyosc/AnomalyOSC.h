@@ -8,50 +8,6 @@
 
 namespace osc {
 
-	class OSCPacket {
-	public:
-		OSCPacket() {}
-	};
-
-	//----------------------------------------------------------------------------------------------------
-
-	typedef std::shared_ptr<class OSCMessage> OSCMessageRef;
-	typedef std::function<void( OSCMessageRef &message )> OSCCallbackType;
-
-	class OSCMessage : public OSCPacket {
-	public:
-		OSCMessage( const std::string &address, const std::vector<tnyosc::Argument> &arguments );
-		~OSCMessage();
-
-		static OSCMessageRef create( const std::string &address, const std::vector<tnyosc::Argument> &arguments )
-		{
-			return std::make_shared<OSCMessage>( address, arguments );
-		}
-
-		const std::string& getAddress() const { return mAddress; }
-
-		// GET message argument(s)
-		const std::vector<tnyosc::Argument>& getArgs() const { return mArguments; }
-		const tnyosc::Argument& getArg( int index ) const { return mArguments[index]; }
-		const tnyosc::Argument& operator[]( int index ) const { return getArg( index ); }
-
-		// CONVENIENCE accessors (refactor tnyosc <Argument>).
-		std::string getString( int index ) const { return getArg( index ).data.s; }
-		int getInt( int index ) const { return getArg( index ).data.i; }
-		float getFloat( int index ) const { return getArg( index ).data.f; }
-		bool getBool( int index ) const { return ( getArg( index ).data.i == 1 ) ? true : false; }
-
-		std::string getSender() const { return getString( 0 ); }
-		std::string getRecipient() const { return getString( 1 ); }
-
-		// STREAM support
-		friend std::ostream& operator<<( std::ostream& s, const OSCMessage& o ) { return s << "[" << o.getAddress() << "]"; }
-
-	private:
-		std::string	mAddress;
-		std::vector<tnyosc::Argument> mArguments;
-	};
-
 	//----------------------------------------------------------------------------------------------------
 
 	typedef std::shared_ptr<class OSCRequest> OSCRequestRef;

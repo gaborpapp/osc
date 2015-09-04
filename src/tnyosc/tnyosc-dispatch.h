@@ -27,10 +27,9 @@
 /// @file tnyosc-dispatch.hpp
 /// @brief tnyosc dispatch header file
 /// @author Toshiro Yamada
-#ifndef __TNY_OSC_DISPATCH__
-#define __TNY_OSC_DISPATCH__
+#pragma once
 
-#include "tnyosc.h"
+#include "Message.h"
 
 #include <string>
 #include <vector>
@@ -40,96 +39,62 @@
 
 namespace tnyosc {
 
-	struct Argument {
-		char type;    // OSC type tag
-		size_t size;  // size in byte
-		union {
-			int32_t i;  // int32
-			float f;    // float32
-			char* s;    // OSC-string 
-			void* b;    // OSC-blob
-			int64_t h;  // int64
-			double d;   // float64
-			uint64_t t; // OSC-timetag
-			char* S;    // Alternate OSC-string, such as "symbols"
-			char c;     // ASCII character
-			uint32_t r; // 32-bit RGBA color
-			struct {
-				uint8_t port;
-				uint8_t status;
-				uint8_t data1;
-				uint8_t data2;
-			} m;        // MIDI data
-		} data;
+/*
+typedef void (*osc_method)(const std::string& address,
+const std::vector<Argument>& argv, void* user_data);
+*/
+using ReceivedMessageCallback = std::function<void( const std::string &, const Message &, void * )>;
 
-		Argument();
-		Argument( const Argument& a );
-		virtual ~Argument();
-		Argument& operator=( const Argument& a );
-	};
+// structure to hold method handles
+struct MethodTemplate {
+	std::string address; // OSC-Address
+	std::string types; // OSC-types as a string
+	void* user_data; // user data
+	ReceivedMessageCallback method; // OSC-Methods to call
+};
 
-	/*
-	typedef void (*osc_method)(const std::string& address,
-	const std::vector<Argument>& argv, void* user_data);
-	*/
-	typedef std::function<void( const std::string &address, const std::vector<Argument> &argv, void * user_data )> osc_method;
+struct ParsedMessage {
+	uint64_t	timetag;
+	Message		message;
+};
 
-	// structure to hold method handles
-	struct MethodTemplate {
-		std::string address; // OSC-Address
-		std::string types; // OSC-types as a string
-		void* user_data; // user data
-		osc_method method; // OSC-Methods to call
-	};
+// structure to hold callback function for a given OSC packet
+struct Callback {
+	uint64_t timetag; // OSC-timetag to determine when to call the method
+	Message meesage;
+	void* user_data; // user data
+	ReceivedMessageCallback method; // matched method to call
+};
 
-	struct ParsedMessage {
-		uint64_t timetag;
-		std::string address;
-		std::string types;
-		std::vector<Argument> argv;
-	};
+using CallbackRef = std::shared_ptr<struct Callback> ;
+// use to sort list<Callback> according to their timetag
 
-	// structure to hold callback function for a given OSC packet
-	struct Callback {
-		uint64_t timetag; // OSC-timetag to determine when to call the method
-		std::string address;
-		std::vector<Argument> argv;
-		void* user_data; // user data
-		osc_method method; // matched method to call
-	};
+class Dispatcher {
+public:
+	Dispatcher() = default;
+	~Dispatcher() = default;
 
-	typedef std::shared_ptr<struct Callback> CallbackRef;
-	// use to sort list<Callback> according to their timetag
+	/// Add a method template that may respond to an incoming Open Sound Control 
+	/// message. Use match_methods to deserialize a raw OSC message and match 
+	/// with the added methods.
+	void addMethod( const char* address, ReceivedMessageCallback method, void* user_data );
 
-	class Dispatcher {
-	public:
-		Dispatcher();
-		~Dispatcher();
+	/// Deserializes a raw Open Sound Control message (as coming from a network)
+	/// and returns a list of CallbackRef that matches with the registered method
+	/// tempaltes.
+	std::list<CallbackRef> matchMethods( const char* data, size_t size );
 
-		/// Add a method template that may respond to an incoming Open Sound Control 
-		/// message. Use match_methods to deserialize a raw OSC message and match 
-		/// with the added methods.
-		void add_method( const char* address, const char* types,
-						 osc_method method, void* user_data );
+	/// decode_data is called inside match_methods to extract the OSC data from
+	/// a raw data.
+	static bool decode_data( const char* data, size_t size,
+							 std::list<ParsedMessage>& messages, uint64_t timetag = 0 );
 
-		/// Deserializes a raw Open Sound Control message (as coming from a network)
-		/// and returns a list of CallbackRef that matches with the registered method
-		/// tempaltes.
-		std::list<CallbackRef> match_methods( const char* data, size_t size );
+private:
+	static bool decode_osc( const char* data, size_t size,
+							std::list<ParsedMessage>& messages, uint64_t timetag );
+	static bool pattern_match( const std::string& lhs, const std::string& rhs );
 
-		/// decode_data is called inside match_methods to extract the OSC data from
-		/// a raw data.
-		static bool decode_data( const char* data, size_t size,
-								 std::list<ParsedMessage>& messages, uint64_t timetag = 0 );
-
-	private:
-		static bool decode_osc( const char* data, size_t size,
-								std::list<ParsedMessage>& messages, uint64_t timetag );
-		static bool pattern_match( const std::string& lhs, const std::string& rhs );
-
-		std::list<MethodTemplate> methods_;
-	};
+	std::list<MethodTemplate> mMethods;
+};
 
 } // namespace tnyosc
-
-#endif // __TNY_OSC_DISPATCH__

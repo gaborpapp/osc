@@ -70,7 +70,7 @@
 #define htonll(x) ntohll(x)
 #endif
 
-namespace tnyosc {
+namespace osc {
 	
 	enum class ArgType {
 		INTEGER_32,

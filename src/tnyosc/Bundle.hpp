@@ -38,7 +38,7 @@
 #include "utils.h"
 #include "Message.h"
 
-namespace tnyosc {
+namespace osc {
 	
 /// This class represents an Open Sound Control bundle message. A bundle can
 /// contain any number of Message and Bundle.

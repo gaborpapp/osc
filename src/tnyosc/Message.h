@@ -37,7 +37,7 @@
 
 #include "utils.h"
 
-namespace tnyosc {
+namespace osc {
 	
 /// This class represents an Open Sound Control message. It supports Open Sound
 /// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
@@ -45,8 +45,7 @@ namespace tnyosc {
 class Message {
 public:
 	
-	//! Create an OSC message. If address is not given, default OSC address is set
-	//! to "/tnyosc".
+	//! Create an OSC message.
 	explicit Message( const std::string& address );
 	
 	~Message() {}
@@ -107,7 +106,8 @@ public:
 	
 	class Argument {
 	public:
-		Argument( ArgType type, int32_t offset, uint32_t size );
+		Argument();
+		Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
 		Argument( const Argument &arg ) = default;
 		Argument( Argument &&arg ) = default;
 		Argument& operator=( const Argument &arg ) = default;
@@ -115,22 +115,29 @@ public:
 		
 		~Argument() = default;
 		
-		ArgType getArgType() const { return mType; }
-		uint32_t getArgSize() const { return mSize; }
-		int32_t getOffset() const { return mOffset; }
+		ArgType		getArgType() const { return mType; }
+		uint32_t	getArgSize() const { return mSize; }
+		int32_t		getOffset() const { return mOffset; }
+		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
 		
-		char getChar() const;
 		template<typename T>
 		bool convertible() const;
 		
-	private:
+		static char translateArgTypeToChar( ArgType type );
+		static ArgType translateCharToArgType( char type );
 		
+		void swapEndianForTransmit( uint8_t* buffer ) const;
+		
+	private:
 		ArgType			mType;
-		uint32_t		mSize;
 		int32_t			mOffset;
+		uint32_t		mSize;
+		bool			mNeedsEndianSwapForTransmit;
 		
 		friend class Message;
 	};
+	
+	bool compareTypes( const std::string &types );
 	
 	/// Sets the OSC address of this message.
 	/// @param[in] address The new OSC address.
@@ -204,7 +211,11 @@ private:
 	
 	/// Create the OSC message and store it in cache.
 	const ByteBuffer& createCache() const;
-	void bufferCache() const;
+	bool bufferCache( uint8_t *data, size_t size );
+	
+	friend class Sender;
+	friend class Bundle;
+	friend class Receiver;
 };
 	
 Message::Message( const std::string& address )
@@ -215,20 +226,18 @@ Message::Message( const std::string& address )
 inline void Message::append( int32_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_32, getCurrentOffset(), 4 );
-	int32_t a = htonl( v );
+	mDataViews.emplace_back( ArgType::INTEGER_32, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
-	memcpy( b.data(), &a, 4 );
+	memcpy( b.data(), &v, 4 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
 inline void Message::append( float v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::FLOAT, getCurrentOffset(), 4 );
-	int32_t a = htonf( v );
+	mDataViews.emplace_back( ArgType::FLOAT, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
-	memcpy( b.data(), &a, 4 );
+	memcpy( b.data(), &v, 4 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
@@ -246,7 +255,7 @@ inline void Message::append( const char* v, size_t len )
 	if( ! v || len == 0 ) return;
 	mIsCached = false;
 	auto size = len + getTrailingZeros( len );
-	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size);
+	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
 	ByteBuffer b( v, v + len );
 	b.resize( size, 0 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
@@ -256,10 +265,9 @@ inline void Message::appendBlob( void* blob, uint32_t size )
 {
 	mIsCached = false;
 	auto totalBufferSize = 4 + size + getTrailingZeros( size );
-	mDataViews.emplace_back( ArgType::BLOB, getCurrentOffset(), totalBufferSize );
-	int32_t a = htonl( size );
+	mDataViews.emplace_back( ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
 	ByteBuffer b( totalBufferSize, 0 );
-	std::copy( (uint8_t*) &a, (uint8_t*) &a + 4, b.begin() );
+	std::copy( (uint8_t*) &size, (uint8_t*) &size + 4, b.begin() );
 	std::copy( (uint8_t*) blob, (uint8_t*) blob + size, b.begin() + 4 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
@@ -267,10 +275,9 @@ inline void Message::appendBlob( void* blob, uint32_t size )
 inline void Message::appendTimeTag( uint64_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::TIME_TAG, getCurrentOffset(), 8 );
-	uint64_t a = htonll( v );
+	mDataViews.emplace_back( ArgType::TIME_TAG, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
-	memcpy( b.data(), &a, 8 );
+	memcpy( b.data(), &v, 8 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
@@ -286,30 +293,28 @@ inline void Message::append( bool v )
 inline void Message::append( int64_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_64, getCurrentOffset(), 8 );
-	int64_t a = htonll( v );
+	mDataViews.emplace_back( ArgType::INTEGER_64, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
-	memcpy( b.data(), &a, 8 );
+	memcpy( b.data(), &v, 8 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
 inline void Message::append( double v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::DOUBLE, getCurrentOffset(), 8 );
-	int64_t a = htond( v );
+	mDataViews.emplace_back( ArgType::DOUBLE, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
-	memcpy( b.data(), &a, 8 );
+	memcpy( b.data(), &v, 8 );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
 inline void Message::append( char v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::CHAR, getCurrentOffset(), 4 );
-	int32_t a = htonl( v );
+	mDataViews.emplace_back( ArgType::CHAR, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
-	memcpy( b.data(), &a, 4 );
+	b.fill( 0 );
+	b[0] = v;
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
 }
 	
@@ -339,18 +344,22 @@ inline const ByteBuffer& Message::createCache() const
 	mIsCached = true;
 	std::string address( mAddress );
 	size_t addressLen = address.size() + getTrailingZeros( address.size() );
+	std::vector<char> dataArray( mDataArray );
+	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ), 0 );
 	
-	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ) );
-	int i = 0;
+	typesArray[0] = ',';
+	int i = 1;
 	for( auto & dataView : mDataViews ) {
-		typesArray[i++] = dataView.getChar();
+		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getArgType() );
+		if( dataView.needsEndianSwapForTransmit() )
+			dataView.swapEndianForTransmit( reinterpret_cast<uint8_t*>( dataArray.data() ) );
 	}
 	
 	size_t typesArrayLen = typesArray.size();
 	mCache.resize( addressLen + typesArrayLen + mDataArray.size() );
 	std::copy( mAddress.begin(), mAddress.end(), mCache.begin() );
 	std::copy( typesArray.begin(), typesArray.end(), mCache.begin() + addressLen );
-	std::copy( mDataArray.begin(), mDataArray.end(), mCache.begin() + addressLen + typesArrayLen );
+	std::copy( dataArray.begin(), dataArray.end(), mCache.begin() + addressLen + typesArrayLen );
 	return mCache;
 }
 
@@ -433,6 +442,129 @@ inline ci::Buffer Message::getBlob( uint32_t index )
 	uint8_t* data = reinterpret_cast<uint8_t*>( &mDataArray[dataView.getOffset()] );
 	memcpy( ret.getData(), data, dataView.getArgSize() );
 	return ret;
+}
+	
+inline bool Message::bufferCache( uint8_t *data, size_t size )
+{
+	uint8_t *head, *tail;
+	uint32_t i = 0;
+	size_t remain = size;
+	
+	// extract address
+	head = tail = data;
+	while( tail[i] != '\0' && ++i < remain );
+	if( i == remain ) return false;
+	
+	mAddress.insert( 0, (char*)head, i );
+	
+	head += i + getTrailingZeros( i );
+	remain = size - ( head - data );
+	
+	i = 0;
+	tail = head;
+	if( head[i++] != ',' ) return false;
+	
+	// extract types
+	while( tail[i] != '\0' && ++i < remain );
+	if( i == remain ) return false;
+	
+	std::vector<char> types( i - 1 );
+	std::copy( head + 1, head + i, types.begin() );
+	head += i + getTrailingZeros( i );
+	remain = size - ( head - data );
+	
+	// extract data
+	uint32_t int32;
+	uint64_t int64;
+	
+	mDataViews.resize( types.size() );
+	int j = 0;
+	for( auto & dataView : mDataViews ) {
+		dataView.mType = Argument::translateCharToArgType( types[j] );
+		switch( types[j] ) {
+			case 'i':
+			case 'f':
+			case 'r': {
+				dataView.mSize = 4;
+				dataView.mOffset = getCurrentOffset();
+				memcpy( &int32, head, 4 );
+				int32 = htonl( int32 );
+				ByteArray<4> v;
+				memcpy( v.data(), &int32, 4 );
+				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				head += 4;
+				remain -= 4;
+			}
+			break;
+			case 'b': {
+				memcpy( &int32, head, 4 );
+				head += 4;
+				remain -= 4;
+				int32 = htonl( int32 );
+				if( int32 > remain ) return false;
+				dataView.mSize = int32;
+				dataView.mOffset = getCurrentOffset();
+				mDataArray.resize( mDataArray.size() + 4 + int32 );
+				memcpy( &mDataArray[dataView.mOffset], &int32, 4 );
+				memcpy( &mDataArray[dataView.mOffset + 4], head, int32 );
+				head += int32;
+				remain -= int32;
+			}
+			break;
+			case 's':
+			case 'S': {
+				tail = head;
+				i = 0;
+				while( tail[i] != '\0' && ++i < remain );
+				dataView.mSize = i;
+				dataView.mOffset = getCurrentOffset();
+				mDataArray.resize( mDataArray.size() + i + 1 );
+				memcpy( &mDataArray[dataView.mOffset], head, i + 1 );
+				mDataArray[mDataArray.size() - 1] = '\0';
+				i += getTrailingZeros( i );
+				head += i;
+				remain -= i;
+			}
+			break;
+			case 'h':
+			case 'd':
+			case 't': {
+				memcpy( &int64, head, 8 );
+				int64 = htonll( int64 );
+				dataView.mSize = i;
+				dataView.mOffset = getCurrentOffset();
+				ByteArray<8> v;
+				memcpy( v.data(), &int64, 8 );
+				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				head += 8;
+				remain -= 8;
+			}
+			break;
+			case 'c': {
+				dataView.mSize = 4;
+				dataView.mOffset = getCurrentOffset();
+				memcpy( &int32, head, 4 );
+				mDataArray.push_back( (char) htonl( int32 ) );
+				head += 4;
+				remain -= 8;
+			}
+			break;
+			case 'm': {
+				dataView.mSize = 4;
+				dataView.mOffset = getCurrentOffset();
+				std::array<uint8_t, 4> v;
+				memcpy( v.data(), head, 4 );
+				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				head += 4;
+				remain -= 4;
+			}
+			break;
+		}
+		j++;
+	}
+	
+	return true;
+
 }
 	
 }

@@ -35,13 +35,45 @@
 
 #include "Message.h"
 
-namespace tnyosc {
+namespace osc {
 	
 using Argument = Message::Argument;
-
-char Argument::getChar() const
+	
+	Argument::Argument()
+	: mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
+	{
+		
+	}
+	
+	Argument::Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap )
+	: mType( type ), mOffset( offset ), mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
+	{
+		
+	}
+	
+ArgType Argument::translateCharToArgType( char type )
 {
-	switch ( mType ) {
+	switch ( type ) {
+		case 'i': return ArgType::INTEGER_32; break;
+		case 'f': return ArgType::FLOAT; break;
+		case 's': return ArgType::STRING; break;
+		case 'b': return ArgType::BLOB; break;
+		case 'h': return ArgType::INTEGER_64; break;
+		case 't': return ArgType::TIME_TAG; break;
+		case 'd': return ArgType::DOUBLE; break;
+		case 'c': return ArgType::CHAR; break;
+		case 'm': return ArgType::MIDI; break;
+		case 'T': return ArgType::BOOL_T; break;
+		case 'F': return ArgType::BOOL_F; break;
+		case 'N': return ArgType::NULL_T; break;
+		case 'I': return ArgType::INFINITUM; break;
+		default: return ArgType::NULL_T; break;
+	}
+}
+
+char Argument::translateArgTypeToChar( ArgType type )
+{
+	switch ( type ) {
 		case ArgType::INTEGER_32: return 'i'; break;
 		case ArgType::FLOAT: return 'f'; break;
 		case ArgType::STRING: return 's'; break;
@@ -79,6 +111,59 @@ bool Argument::convertible() const
 		case ArgType::NONE: return false;
 		default: return false;
 	}
+}
+	
+void Argument::swapEndianForTransmit( uint8_t *buffer ) const
+{
+	auto ptr = &buffer[mOffset];
+	switch ( mType ) {
+		case ArgType::INTEGER_32: {
+			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
+			memcpy( ptr, &a, 4 );
+		}
+		break;
+		case ArgType::FLOAT: {
+			int32_t a = htonf( *reinterpret_cast<float*>(ptr) );
+			memcpy( ptr, &a, 4 );
+		}
+		break;
+		case ArgType::BLOB: {
+			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
+			memcpy( ptr, &a, 4 );
+		}
+		break;
+		case ArgType::TIME_TAG: {
+			uint64_t a = htonll( *reinterpret_cast<uint64_t*>(ptr) );
+			memcpy( ptr, &a, 8 );
+		}
+		break;
+		case ArgType::INTEGER_64: {
+			int64_t a = htonll( *reinterpret_cast<int64_t*>(ptr) );
+			memcpy( ptr, &a, 8 );
+		}
+		break;
+		case ArgType::DOUBLE: {
+			int64_t a = htond( *reinterpret_cast<double*>(ptr) );
+			memcpy( ptr, &a, 8 );
+		}
+		break;
+		case ArgType::CHAR: {
+			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
+			memcpy( ptr, &a, 4 );
+		}
+		default:
+		break;
+	}
+}
+	
+bool Message::compareTypes( const std::string &types )
+{
+	int i = 0;
+	for( auto & dataView : mDataViews ) {
+		if( Argument::translateArgTypeToChar( dataView.getArgType() ) != types[i++] )
+			return false;
+	}
+	return true;
 }
 	
 }

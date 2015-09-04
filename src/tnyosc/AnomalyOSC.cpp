@@ -9,15 +9,6 @@ using namespace std;
 
 namespace osc {
 
-	OSCMessage::OSCMessage( const std::string &address, const std::vector<tnyosc::Argument> &arguments )
-		: mAddress( address ), mArguments( arguments )
-	{
-	}
-
-	OSCMessage::~OSCMessage()
-	{}
-
-
 	// ================================================================= OSC Request
 
 	OSCRequest::OSCRequest( OSCServer &server, const tnyosc::Message &message )
