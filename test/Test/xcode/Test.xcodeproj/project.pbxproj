@@ -20,11 +20,7 @@
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		B3D606FA1B98E30C00C544D2 /* Receiver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D606F81B98E30C00C544D2 /* Receiver.cpp */; };
 		B3D606FD1B9A121100C544D2 /* Sender.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D606FB1B9A121100C544D2 /* Sender.cpp */; };
-		B3D716271B902617005F70E9 /* pattern.c in Sources */ = {isa = PBXBuildFile; fileRef = B3D716231B902617005F70E9 /* pattern.c */; };
-		B3D716281B902617005F70E9 /* tinyosc.c in Sources */ = {isa = PBXBuildFile; fileRef = B3D716251B902617005F70E9 /* tinyosc.c */; };
-		B3D7162D1B90278E005F70E9 /* tinyosc_test.c in Sources */ = {isa = PBXBuildFile; fileRef = B3D7162C1B90278E005F70E9 /* tinyosc_test.c */; };
 		B3D716381B910376005F70E9 /* AnomalyOSC.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D716331B910376005F70E9 /* AnomalyOSC.cpp */; };
-		B3D716391B910376005F70E9 /* tnyosc-dispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D716351B910376005F70E9 /* tnyosc-dispatch.cpp */; };
 		B3D716401B95F128005F70E9 /* Message.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D7163F1B95F128005F70E9 /* Message.cpp */; };
 		B6E407209AD54F74B4B8DA56 /* CinderApp.icns in Resources */ = {isa = PBXBuildFile; fileRef = 37C823312ED644A583EA36A5 /* CinderApp.icns */; };
 /* End PBXBuildFile section */
@@ -51,16 +47,8 @@
 		B3D606F91B98E30C00C544D2 /* Receiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Receiver.h; sourceTree = "<group>"; };
 		B3D606FB1B9A121100C544D2 /* Sender.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Sender.cpp; sourceTree = "<group>"; };
 		B3D606FC1B9A121100C544D2 /* Sender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Sender.h; sourceTree = "<group>"; };
-		B3D716231B902617005F70E9 /* pattern.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pattern.c; sourceTree = "<group>"; };
-		B3D716241B902617005F70E9 /* pattern.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pattern.h; sourceTree = "<group>"; };
-		B3D716251B902617005F70E9 /* tinyosc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tinyosc.c; sourceTree = "<group>"; };
-		B3D716261B902617005F70E9 /* tinyosc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tinyosc.h; sourceTree = "<group>"; };
-		B3D7162C1B90278E005F70E9 /* tinyosc_test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = tinyosc_test.c; path = ../src/tinyosc_test.c; sourceTree = "<group>"; };
-		B3D7162E1B902799005F70E9 /* test_utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = test_utils.h; path = ../include/test_utils.h; sourceTree = "<group>"; };
 		B3D716331B910376005F70E9 /* AnomalyOSC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AnomalyOSC.cpp; sourceTree = "<group>"; };
 		B3D716341B910376005F70E9 /* AnomalyOSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AnomalyOSC.h; sourceTree = "<group>"; };
-		B3D716351B910376005F70E9 /* tnyosc-dispatch.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "tnyosc-dispatch.cpp"; sourceTree = "<group>"; };
-		B3D716361B910376005F70E9 /* tnyosc-dispatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "tnyosc-dispatch.h"; sourceTree = "<group>"; };
 		B3D7163A1B910391005F70E9 /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		B3D7163B1B910405005F70E9 /* Message.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Message.h; sourceTree = "<group>"; };
 		B3D7163C1B910463005F70E9 /* Bundle.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Bundle.hpp; sourceTree = "<group>"; };
@@ -101,7 +89,6 @@
 		080E96DDFE201D6D7F000001 /* Source */ = {
 			isa = PBXGroup;
 			children = (
-				B3D7162C1B90278E005F70E9 /* tinyosc_test.c */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -159,7 +146,6 @@
 			children = (
 				467374EF606A424DAE58FAAC /* Resources.h */,
 				BAAA8542B57E4794ACE4E3BF /* Test_Prefix.pch */,
-				B3D7162E1B902799005F70E9 /* test_utils.h */,
 			);
 			name = Headers;
 			sourceTree = "<group>";
@@ -194,21 +180,9 @@
 			isa = PBXGroup;
 			children = (
 				B3D716321B910376005F70E9 /* tnyosc */,
-				B3D716221B902617005F70E9 /* tinyosc */,
 			);
 			name = src;
 			path = ../../../src;
-			sourceTree = "<group>";
-		};
-		B3D716221B902617005F70E9 /* tinyosc */ = {
-			isa = PBXGroup;
-			children = (
-				B3D716231B902617005F70E9 /* pattern.c */,
-				B3D716241B902617005F70E9 /* pattern.h */,
-				B3D716251B902617005F70E9 /* tinyosc.c */,
-				B3D716261B902617005F70E9 /* tinyosc.h */,
-			);
-			path = tinyosc;
 			sourceTree = "<group>";
 		};
 		B3D716321B910376005F70E9 /* tnyosc */ = {
@@ -219,8 +193,6 @@
 				B3D7163C1B910463005F70E9 /* Bundle.hpp */,
 				B3D7163F1B95F128005F70E9 /* Message.cpp */,
 				B3D7163B1B910405005F70E9 /* Message.h */,
-				B3D716351B910376005F70E9 /* tnyosc-dispatch.cpp */,
-				B3D716361B910376005F70E9 /* tnyosc-dispatch.h */,
 				B3D7163A1B910391005F70E9 /* utils.h */,
 				B3D606F81B98E30C00C544D2 /* Receiver.cpp */,
 				B3D606F91B98E30C00C544D2 /* Receiver.h */,
@@ -293,13 +265,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B3D716271B902617005F70E9 /* pattern.c in Sources */,
 				B3D716401B95F128005F70E9 /* Message.cpp in Sources */,
 				B3D606FA1B98E30C00C544D2 /* Receiver.cpp in Sources */,
-				B3D7162D1B90278E005F70E9 /* tinyosc_test.c in Sources */,
 				B3D606FD1B9A121100C544D2 /* Sender.cpp in Sources */,
-				B3D716281B902617005F70E9 /* tinyosc.c in Sources */,
-				B3D716391B910376005F70E9 /* tnyosc-dispatch.cpp in Sources */,
 				B3D716381B910376005F70E9 /* AnomalyOSC.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

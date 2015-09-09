@@ -47,25 +47,21 @@ public:
 	
 	//! Create an OSC message.
 	explicit Message( const std::string& address );
-	
 	~Message() {}
 	
-//	friend std::ostream& operator<<( std::ostream& s, const Message& msg )
-//	{
-//		return s << msg.toString().c_str();
-//	}
-	
 	// Functions for appending OSC 1.0 types
-	//! int32
+	
+	//! Appends an int32 to the back of the message.
 	void append( int32_t v );
-	//! float32
+	//! Appends a float to the back of the message.
 	void append( float v );
-	//! OSC-string
+	//! Appends a string to the back of the message.
 	void append( const std::string& v );
-	//! c-string array
+	//! Appends a string to the back of the message.
 	void append( const char* v, size_t len );
-	//! OSC-blob
+	//! Appends an osc blob to the back of the message.
 	void appendBlob( void* blob, uint32_t size );
+	//! Appends an osc blob to the back of the message.
 	void appendBlob( const ci::Buffer &buffer );
 	
 	// Functions for appending OSC 1.1 types
@@ -157,28 +153,12 @@ public:
 	/// @return The OSC message as a ByteArray.
 	/// @see data
 	/// @see size
-	const ByteBuffer& byteArray() const
+	ByteBuffer byteArray() const
 	{
-		if( mIsCached )
-			return mCache;
-		else
-			return createCache();
+		if( ! mIsCached )
+			createCache();
+		return mCache;
 	}
-	
-	/// Returns a complete byte array of this OSC message as a char
-	/// pointer. This call is convenient for actually sending this OSC messager.
-	///
-	/// @return The OSC message as an char*.
-	/// @see byte_array
-	/// @see size
-	///
-	/// <pre>
-	///   int sockfd; // initialize a socket...
-	///   tnyosc::Message* msg; // create a OSC message...
-	///   send_to(sockfd, msg->data(), msg->size(), 0);
-	/// </pre>
-	///
-	const char* data() const { return byteArray().data(); }
 	
 	/// Returns the size of this OSC message.
 	///
@@ -210,7 +190,7 @@ private:
 	mutable ByteBuffer		mCache;
 	
 	/// Create the OSC message and store it in cache.
-	const ByteBuffer& createCache() const;
+	void createCache() const;
 	bool bufferCache( uint8_t *data, size_t size );
 	
 	friend class Sender;
@@ -247,7 +227,7 @@ inline void Message::append( const std::string& v )
 	auto size = v.size() + getTrailingZeros( v.size() );
 	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
 	mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-	mDataArray.resize( mDataArray.size() + 4 - ( v.size() % 4 ), 0 );
+	mDataArray.resize( mDataArray.size() + getTrailingZeros( v.size() ), 0 );
 }
 
 inline void Message::append( const char* v, size_t len )
@@ -339,12 +319,11 @@ inline void Message::appendArray( void* array, size_t size )
 //	mTypesArray.push_back( ']' );
 }
 	
-inline const ByteBuffer& Message::createCache() const
+inline void Message::createCache() const
 {
-	mIsCached = true;
 	std::string address( mAddress );
 	size_t addressLen = address.size() + getTrailingZeros( address.size() );
-	std::vector<char> dataArray( mDataArray );
+	std::vector<uint8_t> dataArray( mDataArray );
 	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ), 0 );
 	
 	typesArray[0] = ',';
@@ -360,7 +339,7 @@ inline const ByteBuffer& Message::createCache() const
 	std::copy( mAddress.begin(), mAddress.end(), mCache.begin() );
 	std::copy( typesArray.begin(), typesArray.end(), mCache.begin() + addressLen );
 	std::copy( dataArray.begin(), dataArray.end(), mCache.begin() + addressLen + typesArrayLen );
-	return mCache;
+	mIsCached = true;
 }
 
 template<typename T>

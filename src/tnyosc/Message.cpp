@@ -39,17 +39,17 @@ namespace osc {
 	
 using Argument = Message::Argument;
 	
-	Argument::Argument()
-	: mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
-	{
-		
-	}
+Argument::Argument()
+: mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
+{
 	
-	Argument::Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap )
-	: mType( type ), mOffset( offset ), mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
-	{
-		
-	}
+}
+
+Argument::Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap )
+: mType( type ), mOffset( offset ), mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
+{
+	
+}
 	
 ArgType Argument::translateCharToArgType( char type )
 {

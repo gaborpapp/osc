@@ -4,7 +4,6 @@
 #include "asio/asio.hpp"
 
 #include "Bundle.hpp"
-#include "tnyosc-dispatch.h"
 
 namespace osc {
 

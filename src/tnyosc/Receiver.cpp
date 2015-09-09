@@ -24,26 +24,29 @@ Receiver::Receiver( Receiver &&other )
 	other.mPort = 0;
 }
 	
-void Receiver::setListener( const std::string &address, Listener listener, void* userData )
+void Receiver::setListener( const std::string &address, Listener listener )
 {
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-							  [address]( const std::pair<std::string, ListenerInfo> &listener ) {
+							  [address]( const std::pair<std::string, Listener> &listener ) {
 								  return address == listener.first;
 							  });
 	if( foundListener != mListeners.end() ) {
-		foundListener->second = ListenerInfo{ listener, userData };
+		foundListener->second = listener;
 	}
 	else {
-		mListeners.push_back( { address, ListenerInfo{ listener, userData } } );
+		mListeners.push_back( { address, listener } );
 	}
 }
 	
 void Receiver::removeListener( const std::string &address )
 {
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-									  [address]( const std::pair<std::string, ListenerInfo> &listener ) {
-										  
+									  [address]( const std::pair<std::string, Listener> &listener ) {
+										  return address == listener.first;
 									  });
+	if( foundListener != mListeners.end() ) {
+		mListeners.erase( foundListener );
+	}
 }
 	
 void Receiver::open()
@@ -54,13 +57,6 @@ void Receiver::open()
 void Receiver::close()
 {
 	mSocket.close();
-}
-	
-void Receiver::setPort( uint16_t port )
-{
-	mSocket.close();
-	mPort = port;
-	mSocket.bind( asio::ip::udp::endpoint( asio::ip::udp::v4(), mPort ) );
 }
 	
 void Receiver::setBufferSize( size_t bufferSize )
@@ -99,10 +95,15 @@ void Receiver::dispatchMethods( uint8_t *data, uint32_t size )
 	
 	// iterate through all the messages and find matches with registered methods
 	for( auto & message : messages ) {
+		bool dispatchedOnce = false;
 		for( auto & listener : mListeners ) {
 			if( patternMatch( message.getAddress(), listener.first ) ) {
-				
+				listener.second( message );
+				dispatchedOnce = true;
 			}
+		}
+		if( ! dispatchedOnce ) {
+			
 		}
 	}
 }

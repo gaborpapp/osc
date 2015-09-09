@@ -16,7 +16,9 @@ namespace osc {
 
 class Sender {
 public:
-	using ErrorHandler = std::function<void( const std::string &, const asio::ip::udp::endpoint &, const std::string &)>;
+	using ErrorHandler = std::function<void( const std::string & /*address*/,
+											const asio::ip::udp::endpoint &/*endpoint*/,
+											const std::string &/*error*/)>;
 	
 	Sender( asio::io_service &io = ci::app::App::get()->io_service() );
 	
@@ -42,7 +44,9 @@ public:
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket.local_endpoint(); }
 	
 private:
-	void writeHandler( std::string address, asio::ip::udp::endpoint recipient, const asio::error_code &error, size_t bytesTransferred );
+	void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> &byte_buffer, std::string address, asio::ip::udp::endpoint recipient );
+	
+	void writeAsync( std::shared_ptr<std::vector<uint8_t>> cache, const std::string &address, const asio::ip::udp::endpoint &recipient );
 	
 	asio::ip::udp::socket mSocket;
 	

@@ -101,7 +101,7 @@ namespace osc {
 	inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
 	
 	/// A byte array type internally used in the tnyosc library.
-	using ByteBuffer = std::vector<char>;
+	using ByteBuffer = std::vector<uint8_t>;
 	template<size_t size>
 	using ByteArray = std::array<char, size>;
 	

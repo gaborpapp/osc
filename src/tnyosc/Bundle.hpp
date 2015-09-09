@@ -105,7 +105,7 @@ public:
 	///   send_to(sockfd, bundle->data(), bundle->size(), 0);
 	/// </pre>
 	///
-	const char* data() const { return mDataArray.data(); }
+	const uint8_t* data() const { return mDataArray.data(); }
 	
 	/// Returns the size of this OSC bundle.
 	///

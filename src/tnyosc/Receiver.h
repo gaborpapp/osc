@@ -14,7 +14,7 @@
 
 namespace osc {
 	
-using Listener = std::function<void( Message message, void* userData )>;
+using Listener = std::function<void( const Message &message )>;
 
 class Receiver {
 public:
@@ -34,18 +34,16 @@ public:
 	void		close();
 	
 	uint16_t	getPort() const { return mPort; }
-	void		setPort( uint16_t port );
 	
-	void		setListener( const std::string &address, Listener listener, void* userData = nullptr );
+	void		setListener( const std::string &address, Listener listener );
 	void		removeListener( const std::string &address );
 	
 	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
 	
-	void		setBufferSize( size_t bufferSize );
-	
-	
 	const asio::ip::udp::socket&	getSocket() { return mSocket; }
 	asio::ip::udp::endpoint			getSocketEndpoint() { return mSocket.local_endpoint(); }
+	
+	void		setBufferSize( size_t bufferSize );
 	
 protected:
 	
@@ -62,13 +60,8 @@ protected:
 	
 	asio::ip::udp::socket		mSocket;
 	std::vector<uint8_t>		mBuffer;
-	
-	struct ListenerInfo {
-		Listener listener;
-		void* userData;
-	};
 
-	std::vector<std::pair<std::string, ListenerInfo>> mListeners;
+	std::vector<std::pair<std::string, Listener>> mListeners;
 	ErrorHandler mErrorHandler;
 };
 
