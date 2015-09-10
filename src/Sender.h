@@ -25,8 +25,8 @@ public:
 	Sender( const Sender &other ) = delete;
 	Sender& operator=( const Sender &other ) = delete;
 	
-	Sender( Sender &&other );
-	Sender& operator=( Sender &&other );
+	Sender( Sender &&other ) = default;
+	Sender& operator=( Sender &&other ) = default;
 	
 	void send( const Message &message, const asio::ip::udp::endpoint &recipient );
 	void send( const Message &message, const std::string &host, uint16_t port );
@@ -48,9 +48,8 @@ private:
 	
 	void writeAsync( std::shared_ptr<std::vector<uint8_t>> cache, const std::string &address, const asio::ip::udp::endpoint &recipient );
 	
-	asio::ip::udp::socket mSocket;
-	
-	ErrorHandler mErrorHandler;
+	asio::ip::udp::socket	mSocket;
+	ErrorHandler			mErrorHandler;
 };
 
 }

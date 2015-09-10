@@ -59,6 +59,7 @@ public:
 	void append( const std::string& v );
 	//! Appends a string to the back of the message.
 	void append( const char* v, size_t len );
+	void append( const char* v ) = delete;
 	//! Appends an osc blob to the back of the message.
 	void appendBlob( void* blob, uint32_t size );
 	//! Appends an osc blob to the back of the message.
@@ -88,16 +89,16 @@ public:
 	// array
 	void appendArray( void* array, size_t size );
 	
-	int32_t		getInt( uint32_t index );
-	float		getFloat( uint32_t index );
-	std::string getString( uint32_t index );
-	int64_t		getTime( uint32_t index );
-	int64_t		getInt64( uint32_t index );
-	double		getDouble( uint32_t index );
-	bool		getBool( uint32_t index );
-	char		getChar( uint32_t index );
-	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 );
-	ci::Buffer	getBlob( uint32_t index );
+	int32_t		getInt( uint32_t index ) const;
+	float		getFloat( uint32_t index ) const;
+	std::string getString( uint32_t index ) const;
+	int64_t		getTime( uint32_t index ) const;
+	int64_t		getInt64( uint32_t index ) const;
+	double		getDouble( uint32_t index ) const;
+	bool		getBool( uint32_t index ) const;
+	char		getChar( uint32_t index ) const;
+	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
+	ci::Buffer	getBlob( uint32_t index ) const;
 	
 	
 	class Argument {
@@ -165,7 +166,12 @@ public:
 	/// @return Size of the OSC message in bytes.
 	/// @see byte_array
 	/// @see data
-	size_t size() const { return byteArray().size(); }
+	size_t size() const
+	{
+		if( ! mIsCached )
+			createCache();
+		return mCache.size();
+	}
 	
 	/// Clears the message.
 	void clear()
@@ -178,10 +184,10 @@ public:
 	
 private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
-	size_t getCurrentOffset() { return mDataArray.size() - 1; }
+	size_t getCurrentOffset() { return mDataArray.size(); }
 	
 	template<typename T>
-	Argument& getDataView( uint32_t index );
+	const Argument& getDataView( uint32_t index ) const;
 	
 	std::string				mAddress;
 	ByteBuffer				mDataArray;
@@ -197,11 +203,6 @@ private:
 	friend class Bundle;
 	friend class Receiver;
 };
-	
-Message::Message( const std::string& address )
-: mAddress( address ), mIsCached( false )
-{
-}
 	
 inline void Message::append( int32_t v )
 {
@@ -247,9 +248,14 @@ inline void Message::appendBlob( void* blob, uint32_t size )
 	auto totalBufferSize = 4 + size + getTrailingZeros( size );
 	mDataViews.emplace_back( ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
 	ByteBuffer b( totalBufferSize, 0 );
-	std::copy( (uint8_t*) &size, (uint8_t*) &size + 4, b.begin() );
-	std::copy( (uint8_t*) blob, (uint8_t*) blob + size, b.begin() + 4 );
+	memcpy( b.data(), &size, 4 );
+	memcpy( b.data() + 4, blob, size );
 	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+}
+	
+inline void Message::appendBlob( const ci::Buffer &buffer )
+{
+	appendBlob( (void*)buffer.getData(), buffer.getSize() );
 }
 	
 inline void Message::appendTimeTag( uint64_t v )
@@ -343,82 +349,104 @@ inline void Message::createCache() const
 }
 
 template<typename T>
-inline Message::Argument& Message::getDataView( uint32_t index )
+inline const Message::Argument& Message::getDataView( uint32_t index ) const
 {
 	if( index >= mDataViews.size() )
 		throw ExcIndexOutOfBounds( mAddress, index );
 	
 	auto &dataView = mDataViews[index];
-	if( dataView.convertible<T>() ) // TODO: change the type to typeid print out.
+	if( ! dataView.convertible<T>() ) // TODO: change the type to typeid print out.
 		throw ExcNonConvertible( mAddress, index, ArgType::INTEGER_32, dataView.getArgType() );
 	
 	return dataView;
 }
 	
-inline int32_t Message::getInt( uint32_t index )
+template<typename T>
+bool Message::Argument::convertible() const
+{
+	switch ( mType ) {
+		case ArgType::INTEGER_32: return std::is_same<T, int32_t>::value;
+		case ArgType::FLOAT: return std::is_same<T, float>::value;
+		case ArgType::STRING: return std::is_same<T, std::string>::value;
+		case ArgType::BLOB: return std::is_same<T, ci::Buffer>::value;
+		case ArgType::INTEGER_64: return std::is_same<T, int64_t>::value;
+		case ArgType::TIME_TAG: return std::is_same<T, int64_t>::value;
+		case ArgType::DOUBLE: return std::is_same<T, double>::value;
+		case ArgType::CHAR: return std::is_same<T, int32_t>::value;
+		case ArgType::MIDI: return std::is_same<T, int32_t>::value;
+		case ArgType::BOOL_T: return std::is_same<T, bool>::value;
+		case ArgType::BOOL_F: return std::is_same<T, bool>::value;
+		case ArgType::NULL_T: return false;
+		case ArgType::INFINITUM: return false;
+		case ArgType::NONE: return false;
+		default: return false;
+	}
+}
+	
+inline int32_t Message::getInt( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	return *reinterpret_cast<int32_t*>(&mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
 }
 	
-inline float Message::getFloat( uint32_t index )
+inline float Message::getFloat( uint32_t index ) const
 {
 	auto &dataView = getDataView<float>( index );
-	return *reinterpret_cast<float*>(&mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<const float*>(&mDataArray[dataView.getOffset()]);
 }
 	
-inline std::string Message::getString( uint32_t index )
+inline std::string Message::getString( uint32_t index ) const
 {
 	auto &dataView = getDataView<std::string>( index );
 	const char* head = reinterpret_cast<const char*>(&mDataArray[dataView.getOffset()]);
 	return std::string( head );
 }
 	
-inline int64_t Message::getTime( uint32_t index )
+inline int64_t Message::getTime( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
 	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
 }
 
-inline int64_t Message::getInt64( uint32_t index )
+inline int64_t Message::getInt64( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
 	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
 }
 	
-inline double Message::getDouble( uint32_t index )
+inline double Message::getDouble( uint32_t index ) const
 {
 	auto &dataView = getDataView<double>( index );
 	return *reinterpret_cast<double*>(mDataArray[dataView.getOffset()]);
 }
 	
-inline bool	Message::getBool( uint32_t index )
+inline bool	Message::getBool( uint32_t index ) const
 {
 	auto &dataView = getDataView<bool>( index );
 	return dataView.getArgType() == ArgType::BOOL_T;
 }
 	
-inline char	Message::getChar( uint32_t index )
+inline char	Message::getChar( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
 	return mDataArray[dataView.getOffset()];
 }
 	
-inline void	Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 )
+inline void	Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	int32_t midiVal = *reinterpret_cast<int32_t*>(&mDataArray[dataView.getOffset()]);
+	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
 	*port = midiVal;
 	*status = midiVal >> 8;
 	*data1 = midiVal >> 16;
 	*data2 = midiVal >> 24;
 }
 	
-inline ci::Buffer Message::getBlob( uint32_t index )
+inline ci::Buffer Message::getBlob( uint32_t index ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
 	ci::Buffer ret( dataView.getArgSize() );
-	uint8_t* data = reinterpret_cast<uint8_t*>( &mDataArray[dataView.getOffset()] );
+	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mDataArray[dataView.getOffset()+4] );
 	memcpy( ret.getData(), data, dataView.getArgSize() );
 	return ret;
 }
@@ -486,7 +514,7 @@ inline bool Message::bufferCache( uint8_t *data, size_t size )
 				mDataArray.resize( mDataArray.size() + 4 + int32 );
 				memcpy( &mDataArray[dataView.mOffset], &int32, 4 );
 				memcpy( &mDataArray[dataView.mOffset + 4], head, int32 );
-				head += int32;
+				head += int32 + 4;
 				remain -= int32;
 			}
 			break;

@@ -18,12 +18,6 @@ Receiver::Receiver( uint16_t port, asio::io_service &io )
 	mSocket.set_option( reuse );
 }
 	
-Receiver::Receiver( Receiver &&other )
-: mPort( other.mPort ), mSocket( std::move( other.mSocket ) )
-{
-	other.mPort = 0;
-}
-	
 void Receiver::setListener( const std::string &address, Listener listener )
 {
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
@@ -66,7 +60,7 @@ void Receiver::setBufferSize( size_t bufferSize )
 	
 void Receiver::listen()
 {
-	asio::async_read( mSocket, asio::buffer( mBuffer ),
+	mSocket.async_receive( asio::buffer( mBuffer ),
 					 std::bind( &Receiver::receiveHandler,
 							   this,
 							   std::placeholders::_1,
@@ -134,12 +128,12 @@ bool Receiver::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &m
 	
 bool Receiver::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
 {
-	ParsedMessage m{ timetag, Message( std::string("") ) };
-	
-	if( ! m.message.bufferCache( (uint8_t*)data, size ) )
+//	ParsedMessage m{ timetag, Message( std::string("") ) };
+	Message message( "" );
+	if( ! message.bufferCache( (uint8_t*)data, size ) )
 		return false;
 	
-	messages.push_back( m );
+	messages.push_back( message );
 	return true;
 }
 	

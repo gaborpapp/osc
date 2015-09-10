@@ -22,9 +22,8 @@ shared_ptr<vector<uint8_t>> createSharedByteBuffer( const Message &message )
 }
 
 Sender::Sender( asio::io_service &io )
-: mSocket( io )
+: mSocket( io,  asio::ip::udp::endpoint( asio::ip::udp::v4(), 8081 ) )
 {
-	
 }
 	
 void Sender::send( const osc::Message &message, const asio::ip::udp::endpoint &recipient )

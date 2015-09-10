@@ -22,7 +22,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{B31E8EFF-F97F-4534-9204-A6D9701E91B0}</ProjectGuid>
+    <ProjectGuid>{9F1F7BD7-8BB2-4E60-AAB9-3C55D50226D0}</ProjectGuid>
     <RootNamespace>Test</RootNamespace>
     <DefaultLanguage>en-US</DefaultLanguage>
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>

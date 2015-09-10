@@ -25,10 +25,10 @@ public:
 	Receiver( const Receiver &other ) = delete;
 	Receiver& operator=( const Receiver &other ) = delete;
 	
-	Receiver( Receiver &&other );
-	Receiver& operator=( Receiver &&other );
+	Receiver( Receiver &&other ) = default;
+	Receiver& operator=( Receiver &&other ) = default;
 	
-	~Receiver();
+	~Receiver() = default;
 	
 	void		open();
 	void		close();
@@ -41,7 +41,7 @@ public:
 	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
 	
 	const asio::ip::udp::socket&	getSocket() { return mSocket; }
-	asio::ip::udp::endpoint			getSocketEndpoint() { return mSocket.local_endpoint(); }
+	asio::ip::udp::endpoint			getLocalEndpoint() { return mSocket.local_endpoint(); }
 	
 	void		setBufferSize( size_t bufferSize );
 	

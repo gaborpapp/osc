@@ -39,6 +39,11 @@ namespace osc {
 	
 using Argument = Message::Argument;
 	
+Message::Message( const std::string& address )
+: mAddress( address ), mIsCached( false )
+{
+}
+	
 Argument::Argument()
 : mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
 {
@@ -91,55 +96,26 @@ char Argument::translateArgTypeToChar( ArgType type )
 	}
 }
 	
-template<typename T>
-bool Argument::convertible() const
-{
-	switch ( mType ) {
-		case ArgType::INTEGER_32: return std::is_same<T, int32_t>::value;
-		case ArgType::FLOAT: return std::is_same<T, float>::value;
-		case ArgType::STRING: return std::is_same<T, std::string>::value;
-		case ArgType::BLOB: return std::is_same<T, ci::Buffer>::value;
-		case ArgType::INTEGER_64: return std::is_same<T, int64_t>::value;
-		case ArgType::TIME_TAG: return std::is_same<T, int64_t>::value;
-		case ArgType::DOUBLE: return std::is_same<T, double>::value;
-		case ArgType::CHAR: return std::is_same<T, int32_t>::value;
-		case ArgType::MIDI: return std::is_same<T, int32_t>::value;
-		case ArgType::BOOL_T: return std::is_same<T, bool>::value;
-		case ArgType::BOOL_F: return std::is_same<T, bool>::value;
-		case ArgType::NULL_T: return false;
-		case ArgType::INFINITUM: return false;
-		case ArgType::NONE: return false;
-		default: return false;
-	}
-}
-	
 void Argument::swapEndianForTransmit( uint8_t *buffer ) const
 {
 	auto ptr = &buffer[mOffset];
 	switch ( mType ) {
-		case ArgType::INTEGER_32: {
-			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
-			memcpy( ptr, &a, 4 );
-		}
-		break;
-		case ArgType::FLOAT: {
-			int32_t a = htonf( *reinterpret_cast<float*>(ptr) );
-			memcpy( ptr, &a, 4 );
-		}
-		break;
+		case ArgType::INTEGER_32:
+		case ArgType::CHAR:
 		case ArgType::BLOB: {
 			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
 			memcpy( ptr, &a, 4 );
 		}
 		break;
+		case ArgType::INTEGER_64:
 		case ArgType::TIME_TAG: {
 			uint64_t a = htonll( *reinterpret_cast<uint64_t*>(ptr) );
 			memcpy( ptr, &a, 8 );
 		}
-		break;
-		case ArgType::INTEGER_64: {
-			int64_t a = htonll( *reinterpret_cast<int64_t*>(ptr) );
-			memcpy( ptr, &a, 8 );
+			break;
+		case ArgType::FLOAT: {
+			int32_t a = htonf( *reinterpret_cast<float*>(ptr) );
+			memcpy( ptr, &a, 4 );
 		}
 		break;
 		case ArgType::DOUBLE: {
@@ -147,12 +123,7 @@ void Argument::swapEndianForTransmit( uint8_t *buffer ) const
 			memcpy( ptr, &a, 8 );
 		}
 		break;
-		case ArgType::CHAR: {
-			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
-			memcpy( ptr, &a, 4 );
-		}
-		default:
-		break;
+		default: break;
 	}
 }
 	
