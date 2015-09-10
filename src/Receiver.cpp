@@ -129,11 +129,11 @@ bool Receiver::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &m
 bool Receiver::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
 {
 //	ParsedMessage m{ timetag, Message( std::string("") ) };
-	Message message( "" );
+	Message message;
 	if( ! message.bufferCache( (uint8_t*)data, size ) )
 		return false;
 	
-	messages.push_back( message );
+	messages.push_back( std::move( message ) );
 	return true;
 }
 	

@@ -46,8 +46,13 @@ class Message {
 public:
 	
 	//! Create an OSC message.
+	Message() = default;
 	explicit Message( const std::string& address );
-	~Message() {}
+	Message( const Message & ) = delete;
+	Message& operator=( const Message & ) = delete;
+	Message( Message && ) = default;
+	Message& operator=( Message && ) = default;
+	~Message() = default;
 	
 	// Functions for appending OSC 1.0 types
 	
@@ -69,7 +74,7 @@ public:
 	// OSC-timetag (NTP format)
 	void appendTimeTag( uint64_t v );
 	// appends the current UTP timestamp
-	void appendCurrentTime() { appendTimeTag( get_current_ntp_time() ); }
+	void appendCurrentTime() { appendTimeTag( time::get_current_ntp_time() ); }
 	// 'T'(True) or 'F'(False)
 	void append( bool v );
 	// Null (or nil)
