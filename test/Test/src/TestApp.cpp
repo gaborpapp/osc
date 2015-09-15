@@ -82,6 +82,7 @@ void TestApp::mouseDown( MouseEvent event )
 	mTransmitStruct.myFloat = 45.4f;
 	mTransmitStruct.myDouble = 1.01;
 	message3.appendBlob( &mTransmitStruct, sizeof(TestStruct) );
+	cout << message3 << endl;
 	mSender.send( message3, asio::ip::udp::endpoint( asio::ip::address::from_string( "127.0.0.1" ), 8080 ) );
 }
 

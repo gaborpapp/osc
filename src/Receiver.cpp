@@ -10,12 +10,25 @@
 
 namespace osc {
 	
-Receiver::Receiver( uint16_t port, asio::io_service &io )
-: mPort( port ), mSocket( io, asio::ip::udp::endpoint( asio::ip::udp::v4(), mPort ) ),
+Receiver::Receiver( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
+: mSocket( new asio::ip::udp::socket( io, asio::ip::udp::endpoint( protocol, port ) ) ),
 	 mBuffer( 4096 )
 {
 	asio::socket_base::reuse_address reuse( true );
-	mSocket.set_option( reuse );
+	mSocket->set_option( reuse );
+}
+	
+Receiver::Receiver( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
+: mSocket( new asio::ip::udp::socket( io, localEndpoint ) ),
+	mBuffer( 4096 )
+{
+	asio::socket_base::reuse_address reuse( true );
+	mSocket->set_option( reuse );
+}
+	
+Receiver::Receiver( SocketRef socket )
+: mSocket( socket ), mBuffer( 4096 )
+{
 }
 	
 void Receiver::setListener( const std::string &address, Listener listener )
@@ -43,24 +56,9 @@ void Receiver::removeListener( const std::string &address )
 	}
 }
 	
-void Receiver::open()
-{
-	listen();
-}
-	
-void Receiver::close()
-{
-	mSocket.close();
-}
-	
-void Receiver::setBufferSize( size_t bufferSize )
-{
-	mBuffer.resize( bufferSize );
-}
-	
 void Receiver::listen()
 {
-	mSocket.async_receive( asio::buffer( mBuffer ),
+	mSocket->async_receive( asio::buffer( mBuffer ),
 					 std::bind( &Receiver::receiveHandler,
 							   this,
 							   std::placeholders::_1,

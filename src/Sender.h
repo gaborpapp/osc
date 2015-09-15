@@ -20,35 +20,37 @@ public:
 											const asio::ip::udp::endpoint &/*endpoint*/,
 											const std::string &/*error*/)>;
 	
-	Sender( asio::io_service &io = ci::app::App::get()->io_service() );
+	Sender( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	Sender( uint16_t localPort,  const asio::ip::udp::endpoint &destination, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	Sender( const UDPSocketRef &socket, const asio::ip::udp::endpoint &destination );
 	
 	Sender( const Sender &other ) = delete;
 	Sender& operator=( const Sender &other ) = delete;
-	
 	Sender( Sender &&other ) = default;
 	Sender& operator=( Sender &&other ) = default;
 	
-	void send( const Message &message, const asio::ip::udp::endpoint &recipient );
-	void send( const Message &message, const std::string &host, uint16_t port );
-	void send( const Message &message, const std::vector<asio::ip::udp::endpoint> &recipients );
-	void broadcast( const Message &message, uint16_t port );
+	//! Sends \a message to the destination endpoint.
+	void send( const Message &message );
+	//! Sends \a bundle to the destination endpoint.
+	void send( const Bundle &bundle );
 	
-	void send( const Bundle &bundle, const asio::ip::udp::endpoint &recipient );
-	void send( const Bundle &bundle, const std::string &host, uint16_t port );
-	void send( const Bundle &bundle, const std::vector<asio::ip::udp::endpoint> &recipients );
-	void broadcast( const Bundle &bundle, uint16_t port );
-	
-	void setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
-	
-	const asio::ip::udp::socket& getSocket() { return mSocket; }
-	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket.local_endpoint(); }
+	//! Adds a handler to be called if there are errors with the asynchronous receive.
+	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
+	//! Returns a const reference to the underlying SocketRef.
+	const UDPSocketRef&			getSocket() { return mSocket; }
+	//! Returns the local endpoint associated with this socket.
+	asio::ip::udp::endpoint		getLocalEndpoint() { return mSocket->local_endpoint(); }
+	//! Returns the remote endpoint associated with this sender.
+	const asio::ip::udp::endpoint& getRemoteEndpoint() { return mDestinationEndpoint; }
 	
 private:
-	void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> &byte_buffer, std::string address, asio::ip::udp::endpoint recipient );
+	//!
+	void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> &byte_buffer, std::string address );
+	//!
+	void writeAsync( std::shared_ptr<std::vector<uint8_t>> cache, const std::string &address );
 	
-	void writeAsync( std::shared_ptr<std::vector<uint8_t>> cache, const std::string &address, const asio::ip::udp::endpoint &recipient );
-	
-	asio::ip::udp::socket	mSocket;
+	UDPSocketRef			mSocket;
+	asio::ip::udp::endpoint mDestinationEndpoint;
 	ErrorHandler			mErrorHandler;
 };
 

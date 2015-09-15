@@ -43,6 +43,7 @@
 #include <vector>
 #include <memory>
 #include <iostream>
+#include "asio/asio.hpp"
 
 // Following code snippets were taken from
 // http://www.jbox.dk/sanos/source/include/net/inet.h.html
@@ -71,6 +72,8 @@
 #endif
 
 namespace osc {
+	
+using UDPSocketRef = std::shared_ptr<asio::ip::udp::socket>;
 	
 /// Convert 32-bit float to a big-endian network format
 inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }

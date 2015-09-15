@@ -71,40 +71,84 @@ public:
 	void appendBlob( const ci::Buffer &buffer );
 	
 	// Functions for appending OSC 1.1 types
-	// OSC-timetag (NTP format)
+	//! Appends an OSC-timetag (NTP format) to the back of the message.
 	void appendTimeTag( uint64_t v );
-	// appends the current UTP timestamp
+	//! Appends the current UTP timestamp to the back of the message.
 	void appendCurrentTime() { appendTimeTag( time::get_current_ntp_time() ); }
-	// 'T'(True) or 'F'(False)
+	//! Appends a 'T'(True) or 'F'(False) to the back of the message.
 	void append( bool v );
-	// Null (or nil)
+	//! Appends a Null (or nil) to the back of the message.
 	void appendNull() { mIsCached = false; mDataViews.emplace_back( ArgType::NULL_T, -1, 0 ); }
-	// Impulse (or Infinitum)
+	//! Appends an Impulse (or Infinitum) to the back of the message
 	void appendImpulse() { mIsCached = false; mDataViews.emplace_back( ArgType::INFINITUM, -1, 0 ); }
 	
 	// Functions for appending nonstandard types
-	// int64
+	//! Appends an int64_t to the back of the message.
 	void append( int64_t v );
-	// float64 (or double)
+	//! Appends a float64 (or double) to the back of the message.
 	void append( double v );
-	// ascii character
+	//! Appends an ascii character to the back of the message.
 	void append( char v );
-	// midi
+	//! Appends a midi value to the back of the message.
 	void appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 );
-	// array
-	void appendArray( void* array, size_t size );
+	// TODO: figure out if array is useful.
+	// void appendArray( void* array, size_t size );
 	
+	//! Returns the int32_t located at \a index.
 	int32_t		getInt( uint32_t index ) const;
+	//! Returns the float located at \a index.
 	float		getFloat( uint32_t index ) const;
+	//! Returns the string located at \a index.
 	std::string getString( uint32_t index ) const;
+	//! Returns the time_tag located at \a index.
 	int64_t		getTime( uint32_t index ) const;
+	//! Returns the time_tag located at \a index.
 	int64_t		getInt64( uint32_t index ) const;
+	//! Returns the double located at \a index.
 	double		getDouble( uint32_t index ) const;
+	//! Returns the bool located at \a index.
 	bool		getBool( uint32_t index ) const;
+	//! Returns the char located at \a index.
 	char		getChar( uint32_t index ) const;
+
 	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
+	//! Returns the blob, as a ci::Buffer, located at \a index.
 	ci::Buffer	getBlob( uint32_t index ) const;
 	
+	//! Returns the argument type located at \a index.
+	ArgType		getArgType( uint32_t index ) const;
+	
+	bool compareTypes( const std::string &types );
+	
+	/// Sets the OSC address of this message.
+	/// @param[in] address The new OSC address.
+	void setAddress( const std::string& address );
+	
+	/// Returns the OSC address of this message.
+	const std::string& getAddress() const { return mAddress; }
+	
+	/// Returns a complete byte array of this OSC message as a ByteArray type.
+	/// The byte array is constructed lazily and is cached until the cache is
+	/// obsolete. Call to |data| and |size| perform the same caching.
+	///
+	/// @return The OSC message as a ByteArray.
+	/// @see data
+	/// @see size
+	ByteBuffer byteArray() const;
+	
+	/// Returns the size of this OSC message.
+	///
+	/// @return Size of the OSC message in bytes.
+	/// @see byte_array
+	/// @see data
+	size_t size() const;
+	
+	/// Clears the message.
+	void clear();
+	
+private:
+	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
+	size_t getCurrentOffset() { return mDataArray.size(); }
 	
 	class Argument {
 	public:
@@ -121,6 +165,7 @@ public:
 		uint32_t	getArgSize() const { return mSize; }
 		int32_t		getOffset() const { return mOffset; }
 		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
+		void		outputValueToStream( uint8_t *buffer, std::ostream &ostream ) const;
 		
 		template<typename T>
 		bool convertible() const;
@@ -131,6 +176,7 @@ public:
 		void swapEndianForTransmit( uint8_t* buffer ) const;
 		
 	private:
+		
 		ArgType			mType;
 		int32_t			mOffset;
 		uint32_t		mSize;
@@ -138,58 +184,6 @@ public:
 		
 		friend class Message;
 	};
-	
-	bool compareTypes( const std::string &types );
-	
-	/// Sets the OSC address of this message.
-	/// @param[in] address The new OSC address.
-	void setAddress( const std::string& address )
-	{
-		mIsCached = false;
-		mAddress = address;
-	}
-	
-	/// Returns the OSC address of this message.
-	const std::string& getAddress() const { return mAddress; }
-	
-	/// Returns a complete byte array of this OSC message as a ByteArray type.
-	/// The byte array is constructed lazily and is cached until the cache is
-	/// obsolete. Call to |data| and |size| perform the same caching.
-	///
-	/// @return The OSC message as a ByteArray.
-	/// @see data
-	/// @see size
-	ByteBuffer byteArray() const
-	{
-		if( ! mIsCached )
-			createCache();
-		return mCache;
-	}
-	
-	/// Returns the size of this OSC message.
-	///
-	/// @return Size of the OSC message in bytes.
-	/// @see byte_array
-	/// @see data
-	size_t size() const
-	{
-		if( ! mIsCached )
-			createCache();
-		return mCache.size();
-	}
-	
-	/// Clears the message.
-	void clear()
-	{
-		mIsCached = false;
-		mAddress.clear();
-		mDataViews.clear();
-		mDataArray.clear();
-	}
-	
-private:
-	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
-	size_t getCurrentOffset() { return mDataArray.size(); }
 	
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
@@ -207,376 +201,10 @@ private:
 	friend class Sender;
 	friend class Bundle;
 	friend class Receiver;
+	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 };
-	
-inline void Message::append( int32_t v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_32, getCurrentOffset(), 4, true );
-	ByteArray<4> b;
-	memcpy( b.data(), &v, 4 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::append( float v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::FLOAT, getCurrentOffset(), 4, true );
-	ByteArray<4> b;
-	memcpy( b.data(), &v, 4 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::append( const std::string& v )
-{
-	mIsCached = false;
-	auto size = v.size() + getTrailingZeros( v.size() );
-	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
-	mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-	mDataArray.resize( mDataArray.size() + getTrailingZeros( v.size() ), 0 );
-}
 
-inline void Message::append( const char* v, size_t len )
-{
-	if( ! v || len == 0 ) return;
-	mIsCached = false;
-	auto size = len + getTrailingZeros( len );
-	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
-	ByteBuffer b( v, v + len );
-	b.resize( size, 0 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
 	
-inline void Message::appendBlob( void* blob, uint32_t size )
-{
-	mIsCached = false;
-	auto totalBufferSize = 4 + size + getTrailingZeros( size );
-	mDataViews.emplace_back( ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
-	ByteBuffer b( totalBufferSize, 0 );
-	memcpy( b.data(), &size, 4 );
-	memcpy( b.data() + 4, blob, size );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::appendBlob( const ci::Buffer &buffer )
-{
-	appendBlob( (void*)buffer.getData(), buffer.getSize() );
-}
-	
-inline void Message::appendTimeTag( uint64_t v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::TIME_TAG, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::append( bool v )
-{
-	mIsCached = false;
-	if( v )
-		mDataViews.emplace_back( ArgType::BOOL_T, -1, 0 );
-	else
-		mDataViews.emplace_back( ArgType::BOOL_F, -1, 0 );
-}
-	
-inline void Message::append( int64_t v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_64, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::append( double v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::DOUBLE, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::append( char v )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::CHAR, getCurrentOffset(), 4, true );
-	ByteArray<4> b;
-	b.fill( 0 );
-	b[0] = v;
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 )
-{
-	mIsCached = false;
-	mDataViews.emplace_back( ArgType::MIDI, getCurrentOffset(), 4 );
-	ByteArray<4> b;
-	b[0] = port;
-	b[1] = status;
-	b[2] = data1;
-	b[3] = data2;
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-}
-	
-inline void Message::appendArray( void* array, size_t size )
-{
-	if( !array || size == 0 ) return;
-	mIsCached = false;
-//	mTypesArray.push_back( '[' );
-//	mTypesArray.insert( mTypesArray.end(), (uint8_t*) &array, (uint8_t*) &array + size );
-//	mTypesArray.push_back( ']' );
-}
-	
-inline void Message::createCache() const
-{
-	std::string address( mAddress );
-	size_t addressLen = address.size() + getTrailingZeros( address.size() );
-	std::vector<uint8_t> dataArray( mDataArray );
-	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ), 0 );
-	
-	typesArray[0] = ',';
-	int i = 1;
-	for( auto & dataView : mDataViews ) {
-		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getArgType() );
-		if( dataView.needsEndianSwapForTransmit() )
-			dataView.swapEndianForTransmit( reinterpret_cast<uint8_t*>( dataArray.data() ) );
-	}
-	
-	size_t typesArrayLen = typesArray.size();
-	mCache.resize( addressLen + typesArrayLen + mDataArray.size() );
-	std::copy( mAddress.begin(), mAddress.end(), mCache.begin() );
-	std::copy( typesArray.begin(), typesArray.end(), mCache.begin() + addressLen );
-	std::copy( dataArray.begin(), dataArray.end(), mCache.begin() + addressLen + typesArrayLen );
-	mIsCached = true;
-}
-
-template<typename T>
-inline const Message::Argument& Message::getDataView( uint32_t index ) const
-{
-	if( index >= mDataViews.size() )
-		throw ExcIndexOutOfBounds( mAddress, index );
-	
-	auto &dataView = mDataViews[index];
-	if( ! dataView.convertible<T>() ) // TODO: change the type to typeid print out.
-		throw ExcNonConvertible( mAddress, index, ArgType::INTEGER_32, dataView.getArgType() );
-	
-	return dataView;
-}
-	
-template<typename T>
-bool Message::Argument::convertible() const
-{
-	switch ( mType ) {
-		case ArgType::INTEGER_32: return std::is_same<T, int32_t>::value;
-		case ArgType::FLOAT: return std::is_same<T, float>::value;
-		case ArgType::STRING: return std::is_same<T, std::string>::value;
-		case ArgType::BLOB: return std::is_same<T, ci::Buffer>::value;
-		case ArgType::INTEGER_64: return std::is_same<T, int64_t>::value;
-		case ArgType::TIME_TAG: return std::is_same<T, int64_t>::value;
-		case ArgType::DOUBLE: return std::is_same<T, double>::value;
-		case ArgType::CHAR: return std::is_same<T, int32_t>::value;
-		case ArgType::MIDI: return std::is_same<T, int32_t>::value;
-		case ArgType::BOOL_T: return std::is_same<T, bool>::value;
-		case ArgType::BOOL_F: return std::is_same<T, bool>::value;
-		case ArgType::NULL_T: return false;
-		case ArgType::INFINITUM: return false;
-		case ArgType::NONE: return false;
-		default: return false;
-	}
-}
-	
-inline int32_t Message::getInt( uint32_t index ) const
-{
-	auto &dataView = getDataView<int32_t>( index );
-	return *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
-}
-	
-inline float Message::getFloat( uint32_t index ) const
-{
-	auto &dataView = getDataView<float>( index );
-	return *reinterpret_cast<const float*>(&mDataArray[dataView.getOffset()]);
-}
-	
-inline std::string Message::getString( uint32_t index ) const
-{
-	auto &dataView = getDataView<std::string>( index );
-	const char* head = reinterpret_cast<const char*>(&mDataArray[dataView.getOffset()]);
-	return std::string( head );
-}
-	
-inline int64_t Message::getTime( uint32_t index ) const
-{
-	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
-}
-
-inline int64_t Message::getInt64( uint32_t index ) const
-{
-	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
-}
-	
-inline double Message::getDouble( uint32_t index ) const
-{
-	auto &dataView = getDataView<double>( index );
-	return *reinterpret_cast<double*>(mDataArray[dataView.getOffset()]);
-}
-	
-inline bool	Message::getBool( uint32_t index ) const
-{
-	auto &dataView = getDataView<bool>( index );
-	return dataView.getArgType() == ArgType::BOOL_T;
-}
-	
-inline char	Message::getChar( uint32_t index ) const
-{
-	auto &dataView = getDataView<int32_t>( index );
-	return mDataArray[dataView.getOffset()];
-}
-	
-inline void	Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
-{
-	auto &dataView = getDataView<int32_t>( index );
-	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
-	*port = midiVal;
-	*status = midiVal >> 8;
-	*data1 = midiVal >> 16;
-	*data2 = midiVal >> 24;
-}
-	
-inline ci::Buffer Message::getBlob( uint32_t index ) const
-{
-	auto &dataView = getDataView<ci::Buffer>( index );
-	ci::Buffer ret( dataView.getArgSize() );
-	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mDataArray[dataView.getOffset()+4] );
-	memcpy( ret.getData(), data, dataView.getArgSize() );
-	return ret;
-}
-	
-inline bool Message::bufferCache( uint8_t *data, size_t size )
-{
-	uint8_t *head, *tail;
-	uint32_t i = 0;
-	size_t remain = size;
-	
-	// extract address
-	head = tail = data;
-	while( tail[i] != '\0' && ++i < remain );
-	if( i == remain ) return false;
-	
-	mAddress.insert( 0, (char*)head, i );
-	
-	head += i + getTrailingZeros( i );
-	remain = size - ( head - data );
-	
-	i = 0;
-	tail = head;
-	if( head[i++] != ',' ) return false;
-	
-	// extract types
-	while( tail[i] != '\0' && ++i < remain );
-	if( i == remain ) return false;
-	
-	std::vector<char> types( i - 1 );
-	std::copy( head + 1, head + i, types.begin() );
-	head += i + getTrailingZeros( i );
-	remain = size - ( head - data );
-	
-	// extract data
-	uint32_t int32;
-	uint64_t int64;
-	
-	mDataViews.resize( types.size() );
-	int j = 0;
-	for( auto & dataView : mDataViews ) {
-		dataView.mType = Argument::translateCharToArgType( types[j] );
-		switch( types[j] ) {
-			case 'i':
-			case 'f':
-			case 'r': {
-				dataView.mSize = 4;
-				dataView.mOffset = getCurrentOffset();
-				memcpy( &int32, head, 4 );
-				int32 = htonl( int32 );
-				ByteArray<4> v;
-				memcpy( v.data(), &int32, 4 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-				head += 4;
-				remain -= 4;
-			}
-			break;
-			case 'b': {
-				memcpy( &int32, head, 4 );
-				head += 4;
-				remain -= 4;
-				int32 = htonl( int32 );
-				if( int32 > remain ) return false;
-				dataView.mSize = int32;
-				dataView.mOffset = getCurrentOffset();
-				mDataArray.resize( mDataArray.size() + 4 + int32 );
-				memcpy( &mDataArray[dataView.mOffset], &int32, 4 );
-				memcpy( &mDataArray[dataView.mOffset + 4], head, int32 );
-				head += int32 + 4;
-				remain -= int32;
-			}
-			break;
-			case 's':
-			case 'S': {
-				tail = head;
-				i = 0;
-				while( tail[i] != '\0' && ++i < remain );
-				dataView.mSize = i;
-				dataView.mOffset = getCurrentOffset();
-				mDataArray.resize( mDataArray.size() + i + 1 );
-				memcpy( &mDataArray[dataView.mOffset], head, i + 1 );
-				mDataArray[mDataArray.size() - 1] = '\0';
-				i += getTrailingZeros( i );
-				head += i;
-				remain -= i;
-			}
-			break;
-			case 'h':
-			case 'd':
-			case 't': {
-				memcpy( &int64, head, 8 );
-				int64 = htonll( int64 );
-				dataView.mSize = i;
-				dataView.mOffset = getCurrentOffset();
-				ByteArray<8> v;
-				memcpy( v.data(), &int64, 8 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-				head += 8;
-				remain -= 8;
-			}
-			break;
-			case 'c': {
-				dataView.mSize = 4;
-				dataView.mOffset = getCurrentOffset();
-				memcpy( &int32, head, 4 );
-				mDataArray.push_back( (char) htonl( int32 ) );
-				head += 4;
-				remain -= 8;
-			}
-			break;
-			case 'm': {
-				dataView.mSize = 4;
-				dataView.mOffset = getCurrentOffset();
-				std::array<uint8_t, 4> v;
-				memcpy( v.data(), head, 4 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-				head += 4;
-				remain -= 4;
-			}
-			break;
-		}
-		j++;
-	}
-	
-	return true;
-
-}
+std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	
 }
