@@ -91,7 +91,7 @@
 //		
 //		// Read from the streambuf.
 //		std::cout << "Read buffer contains: " << make_string(read_buffer)
-//		<< std::endl;
+//		<< " " << bytes_transferred << std::endl;
 //		std::string line(
 //						 boost::asio::buffers_begin(read_buffer.data()),
 //						 boost::asio::buffers_begin(read_buffer.data()) + bytes_transferred);

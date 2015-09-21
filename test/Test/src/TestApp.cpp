@@ -29,9 +29,9 @@ class TestApp : public App {
 };
 
 TestApp::TestApp()
-: App(), mSender(), mReceiver( 8080 )
+: App(), mSender( 12345, "127.0.0.1", 8080 ), mReceiver( 8080 )
 {
-	mReceiver.open(); 
+	mReceiver.listen();
 	mReceiver.setListener( "/app/1",
 						  []( const osc::Message &message ){
 							  cout << "Integer: " << message.getInt( 0 ) << endl;
@@ -64,30 +64,35 @@ void TestApp::setup()
 
 void TestApp::mouseDown( MouseEvent event )
 {
-	osc::Message message( "/app/1" );
-	message.append( 245 );
-	mSender.send( message, asio::ip::udp::endpoint( asio::ip::address::from_string( "127.0.0.1" ), 8080 ) );
-	osc::Message message2( "/app/2" );
-	message2.append( std::string("testing") );
-	mSender.send( message2, asio::ip::udp::endpoint( asio::ip::address::from_string( "127.0.0.1" ), 8080 ) );
-	osc::Message message3( "/app/3" );
-	TestStruct mTransmitStruct;
-	mTransmitStruct.myInt = 45;
-	mTransmitStruct.myFloat = 32.4f;
-	mTransmitStruct.myDouble = 128.09;
-	auto buffer = ci::Buffer::create( &mTransmitStruct, sizeof(TestStruct) );
-	message3.appendBlob( *buffer );
-	auto bufferFrom = message3.getBlob( 0 );
-	mTransmitStruct.myInt = 33;
-	mTransmitStruct.myFloat = 45.4f;
-	mTransmitStruct.myDouble = 1.01;
-	message3.appendBlob( &mTransmitStruct, sizeof(TestStruct) );
-	cout << message3 << endl;
-	mSender.send( message3, asio::ip::udp::endpoint( asio::ip::address::from_string( "127.0.0.1" ), 8080 ) );
+	
 }
 
 void TestApp::update()
 {
+	static int i = 245;
+	i++;
+	osc::Message message( "/app/1" );
+	message.append( i );
+	mSender.send( message );
+	osc::Message message2( "/app/2" );
+	static std::string test("testing");
+	test += ".";
+	message2.append( test );
+	mSender.send( message2 );
+	osc::Message message3( "/app/3" );
+	static TestStruct mTransmitStruct{ 0, 0, 0 };
+	mTransmitStruct.myInt += 45;
+	mTransmitStruct.myFloat += 32.4f;
+	mTransmitStruct.myDouble += 128.09;
+	auto buffer = ci::Buffer::create( &mTransmitStruct, sizeof(TestStruct) );
+	message3.appendBlob( *buffer );
+	auto bufferFrom = message3.getBlob( 0 );
+	mTransmitStruct.myInt += 33;
+	mTransmitStruct.myFloat += 45.4f;
+	mTransmitStruct.myDouble += 1.01;
+	message3.appendBlob( &mTransmitStruct, sizeof(TestStruct) );
+	cout << message3 << endl;
+	mSender.send( message3 );
 }
 
 void TestApp::draw()

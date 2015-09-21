@@ -7,32 +7,41 @@
 //
 
 #include "Receiver.h"
+#include "TransportUDP.h"
+
+using namespace std;
+using namespace ci;
+using namespace ci::app;
+using namespace asio;
+using namespace asio::ip;
+using namespace std::placeholders;
 
 namespace osc {
 	
 Receiver::Receiver( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
-: mSocket( new asio::ip::udp::socket( io, asio::ip::udp::endpoint( protocol, port ) ) ),
-	 mBuffer( 4096 )
+: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
+												   asio::ip::udp::endpoint( protocol, port ),
+												   io ) )
 {
-	asio::socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
 }
 	
 Receiver::Receiver( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
-: mSocket( new asio::ip::udp::socket( io, localEndpoint ) ),
-	mBuffer( 4096 )
+: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
+												localEndpoint,
+												io ) )
 {
-	asio::socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
+	
 }
 	
-Receiver::Receiver( SocketRef socket )
-: mSocket( socket ), mBuffer( 4096 )
+Receiver::Receiver( UDPSocketRef socket )
+	: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
+												   socket ) )
 {
 }
 	
 void Receiver::setListener( const std::string &address, Listener listener )
 {
+	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
 							  [address]( const std::pair<std::string, Listener> &listener ) {
 								  return address == listener.first;
@@ -47,6 +56,7 @@ void Receiver::setListener( const std::string &address, Listener listener )
 	
 void Receiver::removeListener( const std::string &address )
 {
+	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
 									  [address]( const std::pair<std::string, Listener> &listener ) {
 										  return address == listener.first;
@@ -58,14 +68,10 @@ void Receiver::removeListener( const std::string &address )
 	
 void Receiver::listen()
 {
-	mSocket->async_receive( asio::buffer( mBuffer ),
-					 std::bind( &Receiver::receiveHandler,
-							   this,
-							   std::placeholders::_1,
-							   std::placeholders::_2 ) );
+	mTransportReceiver->listen();
 }
 	
-void Receiver::receiveHandler( const asio::error_code &error, std::size_t bytesTransferred )
+void Receiver::receiveHandler( const asio::error_code &error, std::size_t bytesTransferred, asio::streambuf &streamBuf )
 {
 	if( error ) {
 		if( mErrorHandler ) {
@@ -73,7 +79,16 @@ void Receiver::receiveHandler( const asio::error_code &error, std::size_t bytesT
 		}
 	}
 	else {
-		dispatchMethods( mBuffer.data(), bytesTransferred );
+		char* data = new char[ bytesTransferred + 1 ]();
+		data[ bytesTransferred ] = 0;
+		streamBuf.commit( bytesTransferred );
+		istream stream( &streamBuf );
+		stream.read( data, bytesTransferred );
+		size_t remainingBytes;
+		if( checkValidity( data, bytesTransferred, &remainingBytes ) ) {
+			dispatchMethods( (uint8_t*)data, bytesTransferred );
+			streamBuf.consume( bytesTransferred );
+		}
 		listen();
 	}
 }
@@ -85,6 +100,7 @@ void Receiver::dispatchMethods( uint8_t *data, uint32_t size )
 	if( ! decodeData( data, size, messages ) ) return;
 	CI_ASSERT( messages.size() > 0 );
 	
+	std::lock_guard<std::mutex> lock( mListenerMutex );
 	// iterate through all the messages and find matches with registered methods
 	for( auto & message : messages ) {
 		bool dispatchedOnce = false;

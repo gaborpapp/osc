@@ -13,31 +13,44 @@
 
 namespace osc {
 	
+class Sender;
+class Receiver;
+	
 class TransportSenderBase {
 public:
+	using WriteHandler = std::function<void(const asio::error_code &/*error*/,
+											size_t/*bytesTransferred*/,
+											std::shared_ptr<std::vector<uint8_t>> /*data*/)>;
 	
 	virtual ~TransportSenderBase() = default;
 	//! Sends \a message to the destination endpoint.
-	virtual void send( const std::shared_ptr<std::vector<uint8_t>> &data ) = 0;
+	virtual void send( std::shared_ptr<std::vector<uint8_t>> data ) = 0;
+	
+	virtual asio::ip::address getRemoteAddress() const = 0;
+	virtual asio::ip::address getLocalAddress() const = 0;
 	
 protected:
-	virtual void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> &byte_buffer, std::string address ) = 0;
 	
-	asio::streambuf mBuffer;
+	WriteHandler mWriteHandler;
 };
 	
 class TransportReceiverBase {
 public:
+	using DataHandler = std::function<void ( const asio::error_code &/*error*/,
+											 size_t/*bytesTransferred*/,
+											 asio::streambuf &/*data*/ )>;
 	
 	virtual ~TransportReceiverBase() = default;
 	//! 
 	virtual void listen() = 0;
+	virtual void close() = 0;
+	
+	virtual asio::ip::address getLocalAddress() const = 0;
 	
 protected:
-	virtual void receiveHandler( const asio::error_code &error,
-								std::size_t bytesTransferred ) = 0;
 	
 	asio::streambuf mBuffer;
+	DataHandler		mDataHandler;
 };
 	
 }

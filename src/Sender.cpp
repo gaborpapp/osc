@@ -9,12 +9,14 @@
 #include "Sender.h"
 
 #include "cinder/Log.h"
+#include "TransportUDP.h"
 
 using namespace std;
 using namespace ci;
 using namespace ci::app;
 using namespace asio;
 using namespace asio::ip;
+using namespace std::placeholders;
 
 namespace osc {
 	
@@ -24,30 +26,29 @@ shared_ptr<vector<uint8_t>> createSharedByteBuffer( const Message &message )
 }
 
 Sender::Sender( uint16_t localPort, const std::string &host, uint16_t port, const udp &protocol, io_service &io )
-: mSocket( new udp::socket( io, udp::endpoint( protocol, localPort ) ) ),
-	mDestinationEndpoint( asio::ip::address::from_string( host ), port )
+: mTransportSender( new TransportSenderUDP( std::bind( &Sender::writeHandler, this, _1, _2, _3 ),
+											ip::udp::endpoint( protocol, localPort ),
+											ip::udp::endpoint( address::from_string( host ), port ), io ) )
 {
-	socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
 }
 	
 Sender::Sender( uint16_t localPort, const udp::endpoint &destination, const udp &protocol, io_service &io )
-: mSocket( new udp::socket( io, udp::endpoint( protocol, localPort ) ) ),
-	mDestinationEndpoint( destination )
+: mTransportSender( new TransportSenderUDP( std::bind( &Sender::writeHandler, this, _1, _2, _3 ),
+										   ip::udp::endpoint( protocol, localPort ),
+										   destination, io ) )
 {
-	socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
 }
 	
-Sender::Sender( const SocketRef &socket, const udp::endpoint &destination )
-: mSocket( socket ), mDestinationEndpoint( destination )
+Sender::Sender( const UDPSocketRef &socket, const udp::endpoint &destination )
+: mTransportSender( new TransportSenderUDP( std::bind( &Sender::writeHandler, this, _1, _2, _3 ),
+										   socket, destination ) )
 {
 }
 	
 void Sender::send( const osc::Message &message )
 {
 	auto cache = createSharedByteBuffer( message );
-	writeAsync( cache, message.getAddress() );
+	mTransportSender->send( cache );
 }
 	
 void Sender::send( const osc::Bundle &bundle )
@@ -55,25 +56,21 @@ void Sender::send( const osc::Bundle &bundle )
 	
 }
 	
-void Sender::writeAsync( std::shared_ptr<std::vector<uint8_t> > cache, const std::string &address )
-{
-	mSocket->async_send_to( asio::buffer( *cache ), mDestinationEndpoint,
-						   std::bind( &Sender::writeHandler, this,
-									 std::placeholders::_1, std::placeholders::_2,
-									 cache, address ) );
-}
-	
-void Sender::writeHandler( const error_code &error, size_t bytesTransferred, shared_ptr<vector<uint8_t>> &byte_buffer, string address )
+void Sender::writeHandler( const error_code &error, size_t bytesTransferred, shared_ptr<vector<uint8_t>> byte_buffer )
 {
 	if( error ) {
-		if( mErrorHandler )
-			mErrorHandler( address, mDestinationEndpoint, error.message() );
+		// get socket address
+		auto socketAddress = mTransportSender->getRemoteAddress();
+		// derive oscAddress
+		std::string oscAddress;
+		if( ! byte_buffer->empty() )
+			oscAddress = ( (const char*)byte_buffer.get() );
+	
+		if( mErrorHandler ) {
+			mErrorHandler( error.message(), socketAddress.to_string(), oscAddress );
+		}
 		else
-			CI_LOG_E( error.message() << ", didn't send message [" << address << "] to " <<
-					 mDestinationEndpoint.address() << ":" << mDestinationEndpoint.port() );
-	}
-	else {
-		byte_buffer.reset();
+			CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << socketAddress.to_string() );
 	}
 }
 
