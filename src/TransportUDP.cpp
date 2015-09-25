@@ -30,13 +30,13 @@ TransportSenderUDP::TransportSenderUDP( WriteHandler writeHandler, const UDPSock
 void TransportSenderUDP::send( std::shared_ptr<std::vector<uint8_t>> data )
 {
 	mSocket->async_send_to( asio::buffer( *data ), mRemoteEndpoint,
-						   [&, data]( const asio::error_code& error, size_t bytesTransferred ) {
-							   mWriteHandler( error, bytesTransferred, data );
-						   });
+	[&, data]( const asio::error_code& error, size_t bytesTransferred ) {
+		   mWriteHandler( error, bytesTransferred, data );
+	});
 }
 	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio::ip::udp::endpoint &localEndpoint, asio::io_service &service )
-: mSocket( new udp::socket( service, localEndpoint ) ), mAmountToReceive( 4096 )
+: mSocket( new udp::socket( service, localEndpoint ) )
 {
 	asio::socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
@@ -44,7 +44,7 @@ TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio:
 }
 	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket )
-: mSocket( socket ), mAmountToReceive( 4096 )
+: mSocket( socket )
 {
 	mDataHandler = dataHandler;
 }
@@ -52,9 +52,13 @@ TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const UDPSo
 void TransportReceiverUDP::listen()
 {
 	mSocket->async_receive( mBuffer.prepare( mAmountToReceive ),
-						   [&]( const error_code &error, size_t bytesTransferred ){
-							   mDataHandler( error, bytesTransferred, mBuffer );
-						   });
+	[&]( const error_code &error, size_t bytesTransferred ){
+		   mDataHandler( error, bytesTransferred, mBuffer );
+		   if( ! error )
+			   listen();
+		   else
+			   close();
+	});
 }
 	
 void TransportReceiverUDP::close()

@@ -89,7 +89,6 @@ void Receiver::receiveHandler( const asio::error_code &error, std::size_t bytesT
 			dispatchMethods( (uint8_t*)data, bytesTransferred );
 			streamBuf.consume( bytesTransferred );
 		}
-		listen();
 	}
 }
 	

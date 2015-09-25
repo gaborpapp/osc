@@ -58,15 +58,11 @@ public:
 	//! Returns the local address of the endpoint associated with this socket.
 	asio::ip::address getLocalAddress() const { return mSocket->local_endpoint().address(); }
 	
-	void setAmountToReceive( size_t amountToReceive ) { mAmountToReceive = amountToReceive; }
-	size_t getAmountToReceive() const { return mAmountToReceive; }
-	
 protected:
 	TransportReceiverUDP( DataHandler dataHandler, const asio::ip::udp::endpoint &localEndpoint, asio::io_service &service );
 	TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket );
 	
 	UDPSocketRef			mSocket;
-	size_t					mAmountToReceive;
 	friend class Receiver;
 };
 	

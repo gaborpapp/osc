@@ -41,16 +41,20 @@ public:
 											 asio::streambuf &/*data*/ )>;
 	
 	virtual ~TransportReceiverBase() = default;
-	//! 
+	
 	virtual void listen() = 0;
 	virtual void close() = 0;
 	
 	virtual asio::ip::address getLocalAddress() const = 0;
 	
+	void setAmountToReceive( size_t amountToReceive ) { mAmountToReceive = amountToReceive; }
+	size_t getAmountToReceive() const { return mAmountToReceive; }
+	
 protected:
 	
 	asio::streambuf mBuffer;
 	DataHandler		mDataHandler;
+	size_t			mAmountToReceive;
 };
 	
 }
