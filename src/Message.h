@@ -42,7 +42,7 @@ namespace osc {
 /// This class represents an Open Sound Control message. It supports Open Sound
 /// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
 /// in http://opensoundcontrol.org/spec-1_0.
-class Message {
+class Message : public TransportData {
 public:
 	
 	//! Create an OSC message.
@@ -134,21 +134,21 @@ public:
 	/// @return The OSC message as a ByteArray.
 	/// @see data
 	/// @see size
-	ByteBuffer byteArray() const;
+	const ByteBuffer& byteArray() const override;
 	
 	/// Returns the size of this OSC message.
 	///
 	/// @return Size of the OSC message in bytes.
 	/// @see byte_array
 	/// @see data
-	size_t size() const;
+	size_t size() const override;
 	
 	/// Clears the message.
-	void clear();
+	void clear() override;
 	
 private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
-	size_t getCurrentOffset() { return mDataArray.size(); }
+	size_t getCurrentOffset() { return mDataBuffer.size(); }
 	
 	class Argument {
 	public:
@@ -188,19 +188,27 @@ private:
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
 	
+	enum class ValidMessage {
+		VALID,
+		NOT_FULL,
+		INVALID
+	};
+	
+	ByteBufferRef getSharedBuffer() const;
+	
 	std::string				mAddress;
-	ByteBuffer				mDataArray;
+	ByteBuffer				mDataBuffer;
 	std::vector<Argument>	mDataViews;
 	mutable bool			mIsCached;
-	mutable ByteBuffer		mCache;
+	mutable ByteBufferRef	mCache;
 	
 	/// Create the OSC message and store it in cache.
 	void createCache() const;
 	bool bufferCache( uint8_t *data, size_t size );
 	
-	friend class Sender;
 	friend class Bundle;
-	friend class Receiver;
+	friend class SenderBase;
+	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 };
 

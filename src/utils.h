@@ -89,6 +89,21 @@ inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
 using ByteBuffer = std::vector<uint8_t>;
 template<size_t size>
 using ByteArray = std::array<uint8_t, size>;
+using ByteBufferRef = std::shared_ptr<ByteBuffer>;
+	
+class TransportData {
+public:
+	virtual ~TransportData() = default;
+	virtual const ByteBuffer& byteArray() const = 0;
+	virtual size_t size() const = 0;
+	virtual void clear() = 0;
+protected:
+	TransportData() = default;
+	
+	virtual ByteBufferRef getSharedBuffer() const = 0;
+	
+	friend class SenderBase;
+};
 	
 enum class ArgType {
 	INTEGER_32,

@@ -127,6 +127,7 @@ void Message::Argument::swapEndianForTransmit( uint8_t *buffer ) const
 	
 void Message::Argument::outputValueToStream( uint8_t *buffer, std::ostream &ostream ) const
 {
+	
 	auto ptr = &buffer[mOffset];
 	switch ( mType ) {
 		case ArgType::INTEGER_32: ostream << *reinterpret_cast<int32_t*>( ptr ); break;
@@ -162,7 +163,7 @@ void Message::append( int32_t v )
 	mDataViews.emplace_back( ArgType::INTEGER_32, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
 	memcpy( b.data(), &v, 4 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::append( float v )
@@ -171,7 +172,7 @@ void Message::append( float v )
 	mDataViews.emplace_back( ArgType::FLOAT, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
 	memcpy( b.data(), &v, 4 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::append( const std::string& v )
@@ -179,8 +180,8 @@ void Message::append( const std::string& v )
 	mIsCached = false;
 	auto size = v.size() + getTrailingZeros( v.size() );
 	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
-	mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
-	mDataArray.resize( mDataArray.size() + getTrailingZeros( v.size() ), 0 );
+	mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
+	mDataBuffer.resize( mDataBuffer.size() + getTrailingZeros( v.size() ), 0 );
 }
 
 void Message::append( const char* v, size_t len )
@@ -191,7 +192,7 @@ void Message::append( const char* v, size_t len )
 	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
 	ByteBuffer b( v, v + len );
 	b.resize( size, 0 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::appendBlob( void* blob, uint32_t size )
@@ -202,7 +203,7 @@ void Message::appendBlob( void* blob, uint32_t size )
 	ByteBuffer b( totalBufferSize, 0 );
 	memcpy( b.data(), &size, 4 );
 	memcpy( b.data() + 4, blob, size );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::appendBlob( const ci::Buffer &buffer )
@@ -216,7 +217,7 @@ void Message::appendTimeTag( uint64_t v )
 	mDataViews.emplace_back( ArgType::TIME_TAG, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::append( bool v )
@@ -234,7 +235,7 @@ void Message::append( int64_t v )
 	mDataViews.emplace_back( ArgType::INTEGER_64, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::append( double v )
@@ -243,7 +244,7 @@ void Message::append( double v )
 	mDataViews.emplace_back( ArgType::DOUBLE, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::append( char v )
@@ -253,7 +254,7 @@ void Message::append( char v )
 	ByteArray<4> b;
 	b.fill( 0 );
 	b[0] = v;
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 )
@@ -265,7 +266,7 @@ void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t d
 	b[1] = status;
 	b[2] = data1;
 	b[3] = data2;
-	mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
+	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
 }
 
 //void Message::appendArray( void* array, size_t size )
@@ -281,7 +282,7 @@ void Message::createCache() const
 {
 	std::string address( mAddress );
 	size_t addressLen = address.size() + getTrailingZeros( address.size() );
-	std::vector<uint8_t> dataArray( mDataArray );
+	std::vector<uint8_t> dataArray( mDataBuffer );
 	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ), 0 );
 	
 	typesArray[0] = ',';
@@ -292,12 +293,29 @@ void Message::createCache() const
 			dataView.swapEndianForTransmit( reinterpret_cast<uint8_t*>( dataArray.data() ) );
 	}
 	
+	if( ! mCache )
+		mCache = ByteBufferRef( new ByteBuffer() );
+	
 	size_t typesArrayLen = typesArray.size();
-	mCache.resize( addressLen + typesArrayLen + mDataArray.size() );
-	std::copy( mAddress.begin(), mAddress.end(), mCache.begin() );
-	std::copy( typesArray.begin(), typesArray.end(), mCache.begin() + addressLen );
-	std::copy( dataArray.begin(), dataArray.end(), mCache.begin() + addressLen + typesArrayLen );
+	ByteArray<4> sizeArray;
+	auto messageSize = (int*)sizeArray.data();
+	*messageSize = addressLen + typesArrayLen + mDataBuffer.size();
+	std::cout << "Expected size: " << *messageSize << std::endl;
+	
+	mCache->resize( 4 + *messageSize );
+	
+	std::copy( sizeArray.begin(),	sizeArray.end(),	mCache->begin() );
+	std::copy( mAddress.begin(),	mAddress.end(),		mCache->begin() + 4 );
+	std::copy( typesArray.begin(),	typesArray.end(),	mCache->begin() + 4 + addressLen );
+	std::copy( dataArray.begin(),	dataArray.end(),	mCache->begin() + 4 + addressLen + typesArrayLen );
 	mIsCached = true;
+}
+	
+ByteBufferRef Message::getSharedBuffer() const
+{
+	if( ! mIsCached )
+		createCache();
+	return mCache;
 }
 
 template<typename T>
@@ -344,56 +362,56 @@ ArgType Message::getArgType( uint32_t index ) const
 int32_t Message::getInt( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	return *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<const int32_t*>(&mDataBuffer[dataView.getOffset()]);
 }
 
 float Message::getFloat( uint32_t index ) const
 {
 	auto &dataView = getDataView<float>( index );
-	return *reinterpret_cast<const float*>(&mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<const float*>(&mDataBuffer[dataView.getOffset()]);
 }
 
 std::string Message::getString( uint32_t index ) const
 {
 	auto &dataView = getDataView<std::string>( index );
-	const char* head = reinterpret_cast<const char*>(&mDataArray[dataView.getOffset()]);
+	const char* head = reinterpret_cast<const char*>(&mDataBuffer[dataView.getOffset()]);
 	return std::string( head );
 }
 
 int64_t Message::getTime( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<int64_t*>(mDataBuffer[dataView.getOffset()]);
 }
 
 int64_t Message::getInt64( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<int64_t*>(mDataBuffer[dataView.getOffset()]);
 }
 
 double Message::getDouble( uint32_t index ) const
 {
 	auto &dataView = getDataView<double>( index );
-	return *reinterpret_cast<double*>(mDataArray[dataView.getOffset()]);
+	return *reinterpret_cast<double*>(mDataBuffer[dataView.getOffset()]);
 }
 
-bool	Message::getBool( uint32_t index ) const
+bool Message::getBool( uint32_t index ) const
 {
 	auto &dataView = getDataView<bool>( index );
 	return dataView.getArgType() == ArgType::BOOL_T;
 }
 
-char	Message::getChar( uint32_t index ) const
+char Message::getChar( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	return mDataArray[dataView.getOffset()];
+	return mDataBuffer[dataView.getOffset()];
 }
 
-void	Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
+void Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mDataArray[dataView.getOffset()]);
+	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mDataBuffer[dataView.getOffset()]);
 	*port = midiVal;
 	*status = midiVal >> 8;
 	*data1 = midiVal >> 16;
@@ -404,7 +422,7 @@ ci::Buffer Message::getBlob( uint32_t index ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
 	ci::Buffer ret( dataView.getArgSize() );
-	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mDataArray[dataView.getOffset()+4] );
+	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mDataBuffer[dataView.getOffset()+4] );
 	memcpy( ret.getData(), data, dataView.getArgSize() );
 	return ret;
 }
@@ -456,7 +474,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				int32 = htonl( int32 );
 				ByteArray<4> v;
 				memcpy( v.data(), &int32, 4 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
 				head += 4;
 				remain -= 4;
 			}
@@ -469,9 +487,9 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				if( int32 > remain ) return false;
 				dataView.mSize = int32;
 				dataView.mOffset = getCurrentOffset();
-				mDataArray.resize( mDataArray.size() + 4 + int32 );
-				memcpy( &mDataArray[dataView.mOffset], &int32, 4 );
-				memcpy( &mDataArray[dataView.mOffset + 4], head, int32 );
+				mDataBuffer.resize( mDataBuffer.size() + 4 + int32 );
+				memcpy( &mDataBuffer[dataView.mOffset], &int32, 4 );
+				memcpy( &mDataBuffer[dataView.mOffset + 4], head, int32 );
 				head += int32 + 4;
 				remain -= int32;
 			}
@@ -483,9 +501,9 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				while( tail[i] != '\0' && ++i < remain );
 				dataView.mSize = i;
 				dataView.mOffset = getCurrentOffset();
-				mDataArray.resize( mDataArray.size() + i + 1 );
-				memcpy( &mDataArray[dataView.mOffset], head, i + 1 );
-				mDataArray[mDataArray.size() - 1] = '\0';
+				mDataBuffer.resize( mDataBuffer.size() + i + 1 );
+				memcpy( &mDataBuffer[dataView.mOffset], head, i + 1 );
+				mDataBuffer[mDataBuffer.size() - 1] = '\0';
 				i += getTrailingZeros( i );
 				head += i;
 				remain -= i;
@@ -500,7 +518,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				dataView.mOffset = getCurrentOffset();
 				ByteArray<8> v;
 				memcpy( v.data(), &int64, 8 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
 				head += 8;
 				remain -= 8;
 			}
@@ -509,7 +527,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				dataView.mSize = 4;
 				dataView.mOffset = getCurrentOffset();
 				memcpy( &int32, head, 4 );
-				mDataArray.push_back( (char) htonl( int32 ) );
+				mDataBuffer.push_back( (char) htonl( int32 ) );
 				head += 4;
 				remain -= 8;
 			}
@@ -519,7 +537,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				dataView.mOffset = getCurrentOffset();
 				std::array<uint8_t, 4> v;
 				memcpy( v.data(), head, 4 );
-				mDataArray.insert( mDataArray.end(), v.begin(), v.end() );
+				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
 				head += 4;
 				remain -= 4;
 			}
@@ -547,18 +565,18 @@ void Message::setAddress( const std::string& address )
 	mAddress = address;
 }
 	
-ByteBuffer Message::byteArray() const
+const ByteBuffer& Message::byteArray() const
 {
 	if( ! mIsCached )
 		createCache();
-	return mCache;
+	return *mCache;
 }
 	
 size_t Message::size() const
 {
 	if( ! mIsCached )
 		createCache();
-	return mCache.size();
+	return mCache->size();
 }
 	
 void Message::clear()
@@ -566,7 +584,7 @@ void Message::clear()
 	mIsCached = false;
 	mAddress.clear();
 	mDataViews.clear();
-	mDataArray.clear();
+	mDataBuffer.clear();
 }
 	
 std::ostream& operator<<( std::ostream &os, const Message &rhs )
@@ -574,7 +592,7 @@ std::ostream& operator<<( std::ostream &os, const Message &rhs )
 	os << "Address: " << rhs.getAddress() << std::endl;
 	for( auto &dataView : rhs.mDataViews ) {
 		os << "\t<" << argTypeToString( dataView.getArgType() ) << ">: ";
-		dataView.outputValueToStream( const_cast<uint8_t*>(rhs.mDataArray.data()), os );
+		dataView.outputValueToStream( const_cast<uint8_t*>(rhs.mDataBuffer.data()), os );
 		os << std::endl;
 	}
 	return os;

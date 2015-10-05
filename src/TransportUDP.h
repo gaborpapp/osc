@@ -43,7 +43,7 @@ protected:
 	UDPSocketRef			mSocket;
 	asio::ip::udp::endpoint mRemoteEndpoint;
 	
-	friend class Sender;
+	friend class SenderUDP;
 };
 	
 class TransportReceiverUDP : public TransportReceiverBase {
@@ -63,7 +63,8 @@ protected:
 	TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket );
 	
 	UDPSocketRef			mSocket;
-	friend class Receiver;
+	
+	friend class ReceiverUDP;
 };
 	
 }

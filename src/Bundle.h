@@ -42,47 +42,26 @@ namespace osc {
 	
 /// This class represents an Open Sound Control bundle message. A bundle can
 /// contain any number of Message and Bundle.
-class Bundle {
+class Bundle : public TransportData {
 public:
 	
-	/// Creates a OSC bundle with timestamp set to immediate. Call set_timetag to
-	/// set a custom timestamp.
-	Bundle()
-	{
-		static std::string id = "#bundle";
-		mDataArray.resize( 16 );
-		std::copy( id.begin(), id.end(), mDataArray.begin() );
-		mDataArray[15] = 1;
-	}
-	~Bundle() {}
+	//! Creates a OSC bundle with timestamp set to immediate. Call set_timetag to
+	//! set a custom timestamp.
+	Bundle();
+	~Bundle() = default;
 	
-	// Functions for adding Message or Bundle.
-	
-	/// Appends an OSC message to this bundle. The message is immediately copied
-	/// into this bundle and any changes to the message after the call to this
-	/// function does not affect this bundle.
-	///
-	/// @param[in] message A pointer to tnyosc::Message.
-	void append( const Message *message ) { append_data( message->byteArray() ); }
-	
-	/// Appends an OSC bundle to this bundle. The bundle may include any number
-	/// of messages or bundles and are immediately copied into this bundle. Any
-	/// changes to the bundle
-	void append( const Bundle *bundle ) { append_data( bundle->byte_array() ); }
-	void append( const Message &message ) { append_data( message.byteArray() ); }
-	void append( const Bundle &bundle ) { append_data( bundle.byte_array() ); }
+	//! Appends an OSC message to this bundle. The message is immediately copied
+	//! into this bundle and any changes to the message after the call to this
+	//! function does not affect this bundle.
+	//!
+	//! @param[in] message A pointer to tnyosc::Message.
+	void append( const TransportData &message ) { append_data( message.byteArray() ); }
 	
 	/// Sets timestamp of the bundle.
 	///
 	/// @param[in] ntp_time NTP Timestamp
 	/// @see get_current_ntp_time
-	void set_timetag( uint64_t ntp_time )
-	{
-		uint64_t a = htonll( ntp_time );
-		ByteArray<8> b;
-		memcpy( &b[0], (char*) &a, 8 );
-		mDataArray.insert( mDataArray.begin() + 8, b.begin(), b.end() );
-	}
+	void set_timetag( uint64_t ntp_time );
 	
 	/// Returns a complete byte array of this OSC bundle as a tnyosc::ByteBuffer
 	/// type.
@@ -90,7 +69,20 @@ public:
 	/// @return The OSC bundle as a tnyosc::ByteBuffer.
 	/// @see data
 	/// @see size
-	const ByteBuffer& byte_array() const { return mDataArray; }
+	const ByteBuffer& byteBuffer() const { return mDataBuffer; }
+	
+	/// Returns the size of this OSC bundle.
+	///
+	/// @return Size of the OSC bundle in bytes.
+	/// @see byte_array
+	/// @see data
+	size_t size() const override { return mDataBuffer.size(); }
+	
+	/// Clears the bundle.
+	void clear() { mDataBuffer.clear(); }
+	
+private:
+	ByteBuffer mDataBuffer;
 	
 	/// Returns a pointer to the byte array of this OSC bundle. This call is
 	/// convenient for actually sending this OSC bundle.
@@ -105,29 +97,9 @@ public:
 	///   send_to(sockfd, bundle->data(), bundle->size(), 0);
 	/// </pre>
 	///
-	const uint8_t* data() const { return mDataArray.data(); }
+	ByteBufferRef getSharedBuffer() const override { return ByteBufferRef( new ByteBuffer( mDataBuffer ) ); }
 	
-	/// Returns the size of this OSC bundle.
-	///
-	/// @return Size of the OSC bundle in bytes.
-	/// @see byte_array
-	/// @see data
-	size_t size() const { return mDataArray.size(); }
-	
-	/// Clears the bundle.
-	void clear() { mDataArray.clear(); }
-	
-private:
-	ByteBuffer mDataArray;
-	
-	void append_data( const ByteBuffer& data )
-	{
-		int32_t a = htonl( data.size() );
-		ByteBuffer b( 4 + data.size() );
-		memcpy( &b[0], (char*) &a, 4 );
-		std::copy( data.begin(), data.end(), b.begin() + 4 );
-		mDataArray.insert( mDataArray.end(), b.begin(), b.end() );
-	}
+	void append_data( const ByteBuffer& data );
 };
 	
 }

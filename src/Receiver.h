@@ -14,22 +14,17 @@ namespace osc {
 	
 using Listener = std::function<void( const Message &message )>;
 
-class Receiver {
+class ReceiverBase {
 public:
 	using ErrorHandler = std::function<void( const std::string & )>;
 	using Listeners = std::vector<std::pair<std::string, Listener>>;
 	
-	Receiver( uint16_t port, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service()  );
-	Receiver( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io = ci::app::App::get()->io_service() );
-	Receiver( UDPSocketRef socket );
+	ReceiverBase( const ReceiverBase &other ) = delete;
+	ReceiverBase& operator=( const ReceiverBase &other ) = delete;
+	ReceiverBase( ReceiverBase &&other ) = default;
+	ReceiverBase& operator=( ReceiverBase &&other ) = default;
 	
-	Receiver( const Receiver &other ) = delete;
-	Receiver& operator=( const Receiver &other ) = delete;
-	
-	Receiver( Receiver &&other ) = default;
-	Receiver& operator=( Receiver &&other ) = default;
-	
-	~Receiver() = default;
+	virtual ~ReceiverBase() = default;
 	
 	//! Commits the socket to asynchronously receive into the internal buffer. Uses receiveHandler, below, as the completion handler.
 	void		listen();
@@ -43,7 +38,7 @@ public:
 	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
 	
 protected:
-	
+	ReceiverBase( std::unique_ptr<TransportReceiverBase> transport );
 	//! Handles the async receive completion operations
 	void receiveHandler( const asio::error_code &error, std::size_t bytesTransferred, asio::streambuf &stream );
 	
@@ -58,6 +53,33 @@ protected:
 	Listeners								mListeners;
 	std::mutex								mListenerMutex;
 	ErrorHandler							mErrorHandler;
+};
+	
+class ReceiverUDP : public ReceiverBase {
+public:
+	ReceiverUDP( uint16_t port,
+				 const asio::ip::udp &protocol = asio::ip::udp::v4(),
+				 asio::io_service &io = ci::app::App::get()->io_service()  );
+	ReceiverUDP( const asio::ip::udp::endpoint &localEndpoint,
+				 asio::io_service &io = ci::app::App::get()->io_service() );
+	ReceiverUDP( UDPSocketRef socket );
+	
+	virtual ~ReceiverUDP() = default;
+	
+protected:
+	
+};
+	
+class ReceiverTCP : public ReceiverBase {
+public:
+	ReceiverTCP( uint16_t port,
+				 const asio::ip::tcp &protocol = asio::ip::tcp::v4(),
+				 asio::io_service &io = ci::app::App::get()->io_service()  );
+	ReceiverTCP( const asio::ip::tcp::endpoint &localEndpoint,
+				 asio::io_service &io = ci::app::App::get()->io_service() );
+	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
+	
+	~ReceiverTCP() = default;
 };
 
 }

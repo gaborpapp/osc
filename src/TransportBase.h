@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Message.h"
-#include "Bundle.hpp"
+#include "Bundle.h"
 
 namespace osc {
 	
@@ -51,6 +51,7 @@ public:
 	size_t getAmountToReceive() const { return mAmountToReceive; }
 	
 protected:
+	TransportReceiverBase( size_t amountToReceive ) : mAmountToReceive( amountToReceive ) {}
 	
 	asio::streambuf mBuffer;
 	DataHandler		mDataHandler;

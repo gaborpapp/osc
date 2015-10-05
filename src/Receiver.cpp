@@ -8,6 +8,9 @@
 
 #include "Receiver.h"
 #include "TransportUDP.h"
+#include "TransportTCP.h"
+
+#include "cinder/Log.h"
 
 using namespace std;
 using namespace ci;
@@ -18,28 +21,52 @@ using namespace std::placeholders;
 
 namespace osc {
 	
-Receiver::Receiver( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
-: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
-												   asio::ip::udp::endpoint( protocol, port ),
-												   io ) )
+ReceiverUDP::ReceiverUDP( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
+	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+	asio::ip::udp::endpoint( protocol, port ),
+	io ) ) )
+{
+}
+
+ReceiverUDP::ReceiverUDP( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
+	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+	localEndpoint,
+	io ) ) )
+{
+}
+
+ReceiverUDP::ReceiverUDP( UDPSocketRef socket )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
+	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+	socket ) ) )
+{
+}
+
+ReceiverTCP::ReceiverTCP( uint16_t port, const asio::ip::tcp &protocol, asio::io_service &io  )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTCP(
+	std::bind( &ReceiverTCP::receiveHandler, this, _1, _2, _3 ),
+	asio::ip::tcp::endpoint( protocol, port ),
+	io ) ) )
+{
+}
+
+ReceiverTCP::ReceiverTCP( const asio::ip::tcp::endpoint &localEndpoint, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTCP(
+	std::bind( &ReceiverTCP::receiveHandler, this, _1, _2, _3 ),
+	localEndpoint,
+	io ) ) )
 {
 }
 	
-Receiver::Receiver( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
-: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
-												localEndpoint,
-												io ) )
+ReceiverBase::ReceiverBase( std::unique_ptr<TransportReceiverBase> transport )
+	: mTransportReceiver( std::move( transport ) )
 {
 	
 }
 	
-Receiver::Receiver( UDPSocketRef socket )
-	: mTransportReceiver( new TransportReceiverUDP( std::bind( &Receiver::receiveHandler, this, _1, _2, _3 ),
-												   socket ) )
-{
-}
-	
-void Receiver::setListener( const std::string &address, Listener listener )
+void ReceiverBase::setListener( const std::string &address, Listener listener )
 {
 	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
@@ -54,7 +81,7 @@ void Receiver::setListener( const std::string &address, Listener listener )
 	}
 }
 	
-void Receiver::removeListener( const std::string &address )
+void ReceiverBase::removeListener( const std::string &address )
 {
 	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
@@ -66,33 +93,33 @@ void Receiver::removeListener( const std::string &address )
 	}
 }
 	
-void Receiver::listen()
+void ReceiverBase::listen()
 {
 	mTransportReceiver->listen();
 }
 	
-void Receiver::receiveHandler( const asio::error_code &error, std::size_t bytesTransferred, asio::streambuf &streamBuf )
+void ReceiverBase::receiveHandler( const asio::error_code &error, std::size_t bytesTransferred, asio::streambuf &streamBuf )
 {
 	if( error ) {
-		if( mErrorHandler ) {
+		if( mErrorHandler )
 			mErrorHandler( error.message() );
-		}
+		else
+			CI_LOG_E( error.message() );
 	}
 	else {
 		char* data = new char[ bytesTransferred + 1 ]();
 		data[ bytesTransferred ] = 0;
-		streamBuf.commit( bytesTransferred );
 		istream stream( &streamBuf );
 		stream.read( data, bytesTransferred );
-		size_t remainingBytes;
+		size_t remainingBytes = 0;
 		if( checkValidity( data, bytesTransferred, &remainingBytes ) ) {
-			dispatchMethods( (uint8_t*)data, bytesTransferred );
-			streamBuf.consume( bytesTransferred );
+			dispatchMethods( (uint8_t*)(data + 4), bytesTransferred );
 		}
+		delete [] data;
 	}
 }
 	
-void Receiver::dispatchMethods( uint8_t *data, uint32_t size )
+void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
 {
 	std::vector<Message> messages;
 	
@@ -115,7 +142,7 @@ void Receiver::dispatchMethods( uint8_t *data, uint32_t size )
 	}
 }
 	
-bool Receiver::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
+bool ReceiverBase::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
 {
 	if( ! memcmp( data, "#bundle\0", 8 ) ) {
 		data += 8; size -= 8;
@@ -139,7 +166,7 @@ bool Receiver::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &m
 	return true;
 }
 	
-bool Receiver::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
+bool ReceiverBase::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
 {
 //	ParsedMessage m{ timetag, Message( std::string("") ) };
 	Message message;
@@ -151,7 +178,7 @@ bool Receiver::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message>
 }
 	
 	
-bool Receiver::patternMatch( const std::string& lhs, const std::string& rhs )
+bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs )
 {
 	bool negate = false;
 	bool mismatched = false;

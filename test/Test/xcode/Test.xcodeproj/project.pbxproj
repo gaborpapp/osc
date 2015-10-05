@@ -18,6 +18,7 @@
 		00B9955B1B128DF400A5C623 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B995591B128DF400A5C623 /* IOSurface.framework */; };
 		5323E6B20EAFCA74003A9687 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5323E6B10EAFCA74003A9687 /* CoreVideo.framework */; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		B3A35BDA1BBF5D6F00CD4466 /* Bundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3A35BD81BBF5D6F00CD4466 /* Bundle.cpp */; };
 		B3D78EED1BADB9C000504EF9 /* TransportTCP.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3D78EEB1BADB9C000504EF9 /* TransportTCP.cpp */; };
 		B3DB89321BA0DDE100961814 /* AnomalyOSC.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3DB89281BA0DDE100961814 /* AnomalyOSC.cpp */; };
 		B3DB89331BA0DDE100961814 /* Message.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B3DB892B1BA0DDE100961814 /* Message.cpp */; };
@@ -50,11 +51,12 @@
 		8AC1CA0FCD2D4ED19E544C92 /* Resources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Resources.h; path = ../include/Resources.h; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* Test.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Test.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A3083A29E03041BFB198D8E5 /* TestApp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; name = TestApp.cpp; path = ../src/TestApp.cpp; sourceTree = "<group>"; };
+		B3A35BD81BBF5D6F00CD4466 /* Bundle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Bundle.cpp; sourceTree = "<group>"; };
 		B3D78EEB1BADB9C000504EF9 /* TransportTCP.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TransportTCP.cpp; sourceTree = "<group>"; };
 		B3D78EEC1BADB9C000504EF9 /* TransportTCP.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TransportTCP.h; sourceTree = "<group>"; };
 		B3DB89281BA0DDE100961814 /* AnomalyOSC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AnomalyOSC.cpp; sourceTree = "<group>"; };
 		B3DB89291BA0DDE100961814 /* AnomalyOSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AnomalyOSC.h; sourceTree = "<group>"; };
-		B3DB892A1BA0DDE100961814 /* Bundle.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Bundle.hpp; sourceTree = "<group>"; };
+		B3DB892A1BA0DDE100961814 /* Bundle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Bundle.h; sourceTree = "<group>"; };
 		B3DB892B1BA0DDE100961814 /* Message.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Message.cpp; sourceTree = "<group>"; };
 		B3DB892C1BA0DDE100961814 /* Message.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Message.h; sourceTree = "<group>"; };
 		B3DB892D1BA0DDE100961814 /* Receiver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Receiver.cpp; sourceTree = "<group>"; };
@@ -198,20 +200,21 @@
 			children = (
 				B3DB89281BA0DDE100961814 /* AnomalyOSC.cpp */,
 				B3DB89291BA0DDE100961814 /* AnomalyOSC.h */,
-				B3DB892A1BA0DDE100961814 /* Bundle.hpp */,
+				B3A35BD81BBF5D6F00CD4466 /* Bundle.cpp */,
+				B3DB892A1BA0DDE100961814 /* Bundle.h */,
 				B3DB892B1BA0DDE100961814 /* Message.cpp */,
 				B3DB892C1BA0DDE100961814 /* Message.h */,
 				B3DB892D1BA0DDE100961814 /* Receiver.cpp */,
 				B3DB892E1BA0DDE100961814 /* Receiver.h */,
 				B3DB892F1BA0DDE100961814 /* Sender.cpp */,
 				B3DB89301BA0DDE100961814 /* Sender.h */,
-				B3DB89361BA15C8F00961814 /* Utils.cpp */,
-				B3DB89311BA0DDE100961814 /* Utils.h */,
 				B3F0B2961BA36ECA00D9C469 /* TransportBase.h */,
-				B3F0B2971BA37FD400D9C469 /* TransportUDP.cpp */,
-				B3F0B2981BA37FD400D9C469 /* TransportUDP.h */,
 				B3D78EEB1BADB9C000504EF9 /* TransportTCP.cpp */,
 				B3D78EEC1BADB9C000504EF9 /* TransportTCP.h */,
+				B3F0B2971BA37FD400D9C469 /* TransportUDP.cpp */,
+				B3F0B2981BA37FD400D9C469 /* TransportUDP.h */,
+				B3DB89361BA15C8F00961814 /* Utils.cpp */,
+				B3DB89311BA0DDE100961814 /* Utils.h */,
 			);
 			name = src;
 			path = ../../../src;
@@ -287,6 +290,7 @@
 				B3DB89321BA0DDE100961814 /* AnomalyOSC.cpp in Sources */,
 				B3DB89351BA0DDE100961814 /* Sender.cpp in Sources */,
 				B3DB89341BA0DDE100961814 /* Receiver.cpp in Sources */,
+				B3A35BDA1BBF5D6F00CD4466 /* Bundle.cpp in Sources */,
 				B3F0B2991BA37FD400D9C469 /* TransportUDP.cpp in Sources */,
 				B3DB89331BA0DDE100961814 /* Message.cpp in Sources */,
 			);

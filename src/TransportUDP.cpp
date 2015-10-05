@@ -8,6 +8,7 @@
 
 #include "TransportUDP.h"
 
+using namespace std;
 using namespace asio;
 using namespace asio::ip;
 
@@ -36,7 +37,7 @@ void TransportSenderUDP::send( std::shared_ptr<std::vector<uint8_t>> data )
 }
 	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio::ip::udp::endpoint &localEndpoint, asio::io_service &service )
-: mSocket( new udp::socket( service, localEndpoint ) )
+: TransportReceiverBase( 4096 ), mSocket( new udp::socket( service, localEndpoint ) )
 {
 	asio::socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
@@ -44,20 +45,24 @@ TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio:
 }
 	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket )
-: mSocket( socket )
+: TransportReceiverBase( 4096 ), mSocket( socket )
 {
 	mDataHandler = dataHandler;
 }
 	
 void TransportReceiverUDP::listen()
 {
-	mSocket->async_receive( mBuffer.prepare( mAmountToReceive ),
+	auto tempBuffer = mBuffer.prepare( mAmountToReceive );
+	
+	mSocket->async_receive( tempBuffer,
 	[&]( const error_code &error, size_t bytesTransferred ){
-		   mDataHandler( error, bytesTransferred, mBuffer );
-		   if( ! error )
-			   listen();
-		   else
-			   close();
+		std::string str( asio::buffers_begin( mBuffer.data() ), asio::buffers_end( mBuffer.data() ) );
+		mBuffer.commit( bytesTransferred );
+		mDataHandler( error, bytesTransferred, mBuffer );
+		if( ! error )
+			listen();
+		else
+			close();
 	});
 }
 	

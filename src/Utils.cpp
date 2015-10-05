@@ -104,5 +104,5 @@ void setClock( uint64_t ntp_time )
 	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
 	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
 }
-
+	
 }} // time // osc
