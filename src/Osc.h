@@ -12,9 +12,9 @@
 
 namespace osc {
 	
-/// This class represents an Open Sound Control message. It supports Open Sound
-/// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
-/// in http://opensoundcontrol.org/spec-1_0.
+//! This class represents an Open Sound Control message. It supports Open Sound
+//! Control 1.0 and 1.1 specifications and extra non-standard arguments listed
+//! in http://opensoundcontrol.org/spec-1_0.
 class Message {
 public:
 	
@@ -179,8 +179,8 @@ private:
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 };
 	
-	/// This class represents an Open Sound Control bundle message. A bundle can
-	/// contain any number of Message and Bundle.
+//! This class represents an Open Sound Control bundle message. A bundle can
+//! contain any number of Message and Bundle.
 class Bundle {
 public:
 	

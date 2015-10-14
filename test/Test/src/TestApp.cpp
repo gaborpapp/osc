@@ -3,8 +3,8 @@
 #include "cinder/gl/gl.h"
 #include "cinder/Log.h"
 
-#include "Sender.h"
-#include "Receiver.h"
+//#include "Sender.h"
+//#include "Receiver.h"
 #include "Osc.h"
 
 using namespace ci;
@@ -35,7 +35,7 @@ TestApp::TestApp()
 : App(), mReceiver( 10000 ), mSender( 12345, "127.0.0.1", 10000 )
 {
 	osc::SenderUdpTemp mSenderUdp( 10000, "", 124 );
-	
+	osc::
 	mReceiver.listen();
 	mReceiver.setListener( "/app/1",
 						  []( const osc::Message &message ){
