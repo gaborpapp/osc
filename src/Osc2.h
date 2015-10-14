@@ -106,13 +106,6 @@ public:
 	virtual ~SenderUdp() = default;
 	
 protected:
-	SenderUdp( WriteHandler writeHandler,
-			  const asio::ip::udp::endpoint &localEndpoint,
-					   const protocol::endpoint &remoteEndpoint,
-					   asio::io_service &service );
-	SenderUdp( WriteHandler writeHandler,
-					   const UdpSocketRef &socket,
-					   const protocol::endpoint &remoteEndpoint );
 	
 	//! Sends the data array /a data to the remote endpoint using the Udp socket, asynchronously.
 	void sendImpl( std::shared_ptr<std::vector<uint8_t>> data ) override;
@@ -145,11 +138,6 @@ public:
 	virtual ~SenderTcp() = default;
 	
 protected:
-	SenderTcp( const asio::ip::tcp::endpoint &localEndpoint,
-			   const asio::ip::tcp::endpoint &remoteEndpoint,
-			   asio::io_service &io );
-	SenderTcp( const TcpSocketRef &socket,
-			   const asio::ip::tcp::endpoint &remoteEndpoint );
 	
 	//! Sends \a message to the destination endpoint.
 	void sendImpl( std::shared_ptr<std::vector<uint8_t>> data ) override;
