@@ -91,6 +91,13 @@ using ByteArray = std::array<uint8_t, size>;
 using ByteBuffer = std::vector<uint8_t>;
 using ByteBufferRef = std::shared_ptr<ByteBuffer>;
 	
+using WriteHandler = std::function<void(const asio::error_code &/*error*/,
+										size_t/*bytesTransferred*/,
+										std::shared_ptr<std::vector<uint8_t>> /*data*/)>;
+using DataHandler = std::function<void ( const asio::error_code &/*error*/,
+										size_t/*bytesTransferred*/,
+										asio::streambuf &/*data*/ )>;
+	
 enum class ArgType {
 	INTEGER_32,
 	FLOAT,
