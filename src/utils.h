@@ -94,6 +94,8 @@ using ByteBufferRef = std::shared_ptr<ByteBuffer>;
 using WriteHandler = std::function<void(const asio::error_code &/*error*/,
 										size_t/*bytesTransferred*/,
 										std::shared_ptr<std::vector<uint8_t>> /*data*/)>;
+using MessageCompleteHandler = std::function<void ( size_t/*bytesTransferred*/,
+												    asio::streambuf &/*data*/ )>;
 using DataHandler = std::function<void ( const asio::error_code &/*error*/,
 										size_t/*bytesTransferred*/,
 										asio::streambuf &/*data*/ )>;

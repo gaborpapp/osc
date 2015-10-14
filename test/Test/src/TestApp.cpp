@@ -5,7 +5,7 @@
 
 #include "Sender.h"
 #include "Receiver.h"
-#include "SenderTemplate.h"
+#include "Osc.h"
 
 using namespace ci;
 using namespace ci::app;

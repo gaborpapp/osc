@@ -146,10 +146,6 @@ public:
 	/// Clears the message.
 	void clear();
 	
-private:
-	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
-	size_t getCurrentOffset() { return mDataBuffer.size(); }
-	
 	class Argument {
 	public:
 		Argument();
@@ -185,14 +181,12 @@ private:
 		friend class Message;
 	};
 	
+private:
+	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
+	size_t getCurrentOffset() { return mDataBuffer.size(); }
+	
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
-	
-	enum class ValidMessage {
-		VALID,
-		NOT_FULL,
-		INVALID
-	};
 	
 	ByteBufferRef getSharedBuffer() const;
 	
