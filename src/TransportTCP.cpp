@@ -17,18 +17,16 @@ using namespace std::placeholders;
 
 namespace osc {
 	
-TransportSenderTCP::TransportSenderTCP( WriteHandler handler, const tcp::endpoint &localEndpoint, const tcp::endpoint &remoteEndpoint, asio::io_service &io )
-: mSocket( new tcp::socket( io, localEndpoint ) ), mRemoteEndpoint( remoteEndpoint )
+TransportSenderTCP::TransportSenderTCP( WriteHandler writeHandler, const tcp::endpoint &localEndpoint, const tcp::endpoint &remoteEndpoint, asio::io_service &io )
+: TransportSenderBase( writeHandler ), mSocket( new tcp::socket( io, localEndpoint ) ), mRemoteEndpoint( remoteEndpoint )
 {
 	socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
-	mWriteHandler = handler;
 }
 	
-TransportSenderTCP::TransportSenderTCP( WriteHandler handler, const TCPSocketRef &socket, const tcp::endpoint &remoteEndpoint )
-: mSocket( socket ), mRemoteEndpoint( remoteEndpoint )
+TransportSenderTCP::TransportSenderTCP( WriteHandler writeHandler, const TCPSocketRef &socket, const tcp::endpoint &remoteEndpoint )
+: TransportSenderBase( writeHandler ), mSocket( socket ), mRemoteEndpoint( remoteEndpoint )
 {
-	mWriteHandler = handler;
 }
 	
 void TransportSenderTCP::connect()
@@ -38,7 +36,7 @@ void TransportSenderTCP::connect()
 	
 void TransportSenderTCP::send( std::shared_ptr<std::vector<uint8_t> > data )
 {
-	data->push_back( (uint8_t)'\n' );
+//	data->push_back( (uint8_t)'\n' );
 	mSocket->async_send( asio::buffer( *data ),
 	[&, data]( const asio::error_code &error, size_t bytesTransferred ){
 		mWriteHandler( error, bytesTransferred, data );
@@ -50,21 +48,24 @@ void TransportSenderTCP::onConnect( const asio::error_code &error )
 	if( error )
 		CI_LOG_E( error.message() );
 }
+	
+void TransportSenderTCP::close()
+{
+	mSocket->close();
+}
 
-using Connection = TransportReceiverTCP::Connection;
-
-Connection::Connection( TCPSocketRef socket, TransportReceiverTCP *transport )
+TransportReceiverTCP::Connection::Connection( TCPSocketRef socket, TransportReceiverTCP *transport )
 : mSocket( socket ), mTransport( transport ), mDataBuffer( 4096 )
 {
 }
 	
-Connection::Connection( Connection && other ) noexcept
+TransportReceiverTCP::Connection::Connection( Connection && other ) noexcept
 : mSocket( move( other.mSocket ) ), mTransport( other.mTransport )
 {
 	//TODO: Decide what to do about buffer copy
 }
 	
-Connection& Connection::operator=( Connection && other ) noexcept
+TransportReceiverTCP::Connection& TransportReceiverTCP::Connection::operator=( Connection && other ) noexcept
 {
 	if( this != &other ) {
 		mSocket = move( other.mSocket );
@@ -73,57 +74,56 @@ Connection& Connection::operator=( Connection && other ) noexcept
 	return *this;
 }
 	
-Connection::~Connection()
+TransportReceiverTCP::Connection::~Connection()
 {
 	close();
 	mTransport = nullptr;
 }
-	
-typedef asio::buffers_iterator<
-asio::streambuf::const_buffers_type> iterator;
 
-std::pair<iterator, bool> match_size(iterator begin, iterator end)
+std::pair<iterator, bool> TransportReceiverTCP::Connection::readMatchCondition(iterator begin, iterator end)
 {
 	iterator i = begin;
-	osc::ByteArray<4> data;
+	ByteArray<4> data;
 	int inc = 0;
-	while ( i != end && inc < 4 ) {
+	while ( i != end && inc < 4 )
 		data[inc++] = *i++;
-	}
-	int* numBytes = reinterpret_cast<int*>( data.data() );
-	if( inc == 4 && *numBytes > 0 && *numBytes + 4 + 1 <= std::distance( begin, end ) ) {
-		return { begin + *numBytes + 4 + 1, true };
+	
+	int numBytes = *reinterpret_cast<int*>( data.data() );
+	// swap for big endian from the other side
+	numBytes = ntohl( numBytes );
+	
+	if( inc == 4 && numBytes > 0 && numBytes + 4 <= std::distance( begin, end ) ) {
+		return { begin + numBytes + 4, true };
 	}
 	else {
 		return { begin, false };
 	}
 }
 	
-void Connection::read()
+void TransportReceiverTCP::Connection::read()
 {
-	asio::async_read_until( *mSocket, mBuffer, &match_size, std::bind( &Connection::onRead, this, _1, _2 ) );
+	asio::async_read_until( *mSocket, mBuffer, &readMatchCondition,
+						   std::bind( &Connection::onReadComplete, this, _1, _2 ) );
 }
 	
-void Connection::onRead( const asio::error_code &error, size_t bytesTransferred )
+void TransportReceiverTCP::Connection::onReadComplete( const asio::error_code &error, size_t bytesTransferred )
 {
 	{
 		std::lock_guard<std::mutex> lock( mTransport->mDataHandlerMutex );
 		mTransport->mDataHandler( error, bytesTransferred, mBuffer );
 	}
 	// TODO: Figure these errors out.
-	//		if( ! error )
 	read();
 }
 	
-void Connection::close()
+void TransportReceiverTCP::Connection::close()
 {
 	mSocket->close();
 }
 	
 TransportReceiverTCP::TransportReceiverTCP( DataHandler dataHandler, const asio::ip::tcp::endpoint &localEndpoint, asio::io_service &service )
-: TransportReceiverBase( 4096 ), mIoService( service ), mAcceptor( mIoService, localEndpoint, true )
+: TransportReceiverBase( dataHandler ), mIoService( service ), mAcceptor( mIoService, localEndpoint, true )
 {
-	mDataHandler = dataHandler;
 }
 	
 void TransportReceiverTCP::listen()

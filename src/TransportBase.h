@@ -25,11 +25,14 @@ public:
 	virtual ~TransportSenderBase() = default;
 	//! Sends \a message to the destination endpoint.
 	virtual void send( std::shared_ptr<std::vector<uint8_t>> data ) = 0;
+	virtual void close() = 0;
 	
 	virtual asio::ip::address getRemoteAddress() const = 0;
 	virtual asio::ip::address getLocalAddress() const = 0;
 	
 protected:
+	TransportSenderBase( WriteHandler writeHandler )
+	: mWriteHandler( writeHandler ) {}
 	
 	WriteHandler mWriteHandler;
 };
@@ -47,15 +50,11 @@ public:
 	
 	virtual asio::ip::address getLocalAddress() const = 0;
 	
-	void setAmountToReceive( size_t amountToReceive ) { mAmountToReceive = amountToReceive; }
-	size_t getAmountToReceive() const { return mAmountToReceive; }
-	
 protected:
-	TransportReceiverBase( size_t amountToReceive ) : mAmountToReceive( amountToReceive ) {}
+	TransportReceiverBase( DataHandler dataHandler )
+	: mDataHandler( dataHandler ) {}
 	
-	asio::streambuf mBuffer;
 	DataHandler		mDataHandler;
-	size_t			mAmountToReceive;
 };
 	
 }

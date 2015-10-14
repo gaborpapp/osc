@@ -24,8 +24,8 @@ class TestApp : public App {
 	void update() override;
 	void draw() override;
 	
-	osc::ReceiverUDP	mReceiver;
-	osc::SenderUDP		mSender;
+	osc::ReceiverTCP	mReceiver;
+	osc::SenderTCP		mSender;
 	
 	bool mIsConnected = false;
 };
@@ -71,7 +71,7 @@ void TestApp::mouseDown( MouseEvent event )
 void TestApp::update()
 {
 	if( ! mIsConnected ) {
-//		mSender.connect();
+		mSender.connect();
 		mIsConnected = true;
 	}
 	else {

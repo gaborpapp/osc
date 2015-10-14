@@ -7,22 +7,17 @@ namespace osc {
 class TransportSenderTCP : public TransportSenderBase {
 public:
 	virtual ~TransportSenderTCP() = default;
-	//! Sends \a message to the destination endpoint.
-	virtual void send( std::shared_ptr<std::vector<uint8_t>> data );
 	
-	//! Returns the underlying tcp socket associated with this transport.
-	const TCPSocketRef& getSocket() const { return mSocket; }
-	//! Returns the local tcp endpoint associated with the socket.
-	asio::ip::tcp::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
-	//! Returns a const reference to the remote tcp endpoint this transport is sending to.
-	const asio::ip::tcp::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
+	void connect();
+	//! Sends \a message to the destination endpoint.
+	void send( std::shared_ptr<std::vector<uint8_t>> data ) override;
+	void close() override;
 	
 	//! Returns the local address of the endpoint associated with this socket.
 	asio::ip::address getLocalAddress() const override { return mSocket->local_endpoint().address(); }
 	//! Returns the remote address of the endpoint associated with this transport.
 	asio::ip::address getRemoteAddress() const override { return mRemoteEndpoint.address(); }
 	
-	void connect();
 	
 protected:
 	TransportSenderTCP(	WriteHandler handler,
@@ -40,6 +35,8 @@ protected:
 	
 	friend class SenderTCP;
 };
+	
+using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
 
 class TransportReceiverTCP : public TransportReceiverBase {
 public:
@@ -50,29 +47,6 @@ public:
 	
 	asio::ip::address getLocalAddress() const override { return mAcceptor.local_endpoint().address(); }
 	
-	struct Connection {
-		Connection( TCPSocketRef socket, TransportReceiverTCP* transport );
-		Connection( const Connection &other ) = delete;
-		Connection( Connection &&other ) noexcept;
-		Connection& operator=( const Connection &other ) = delete;
-		Connection& operator=( Connection &&other ) noexcept;
-		
-		~Connection();
-		
-		asio::ip::tcp::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
-		asio::ip::tcp::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
-		
-		void read();
-		bool readComplete( const asio::error_code &error, size_t bytesTransferred );
-		void onRead( const asio::error_code &error, size_t bytesTransferred );
-		void close();
-		
-		TCPSocketRef			mSocket;
-		TransportReceiverTCP*	mTransport;
-		asio::streambuf			mBuffer;
-		std::vector<uint8_t>	mDataBuffer;
-	};
-	
 protected:
 	TransportReceiverTCP( DataHandler dataHandler,
 						  const asio::ip::tcp::endpoint &localEndpoint,
@@ -82,6 +56,29 @@ protected:
 	void onAccept( TCPSocketRef socket, const asio::error_code &error );
 	void onRead( const asio::error_code &error, size_t bytesTransferred );
 	bool readComplete( const asio::error_code &error, size_t bytesTransferred );
+	
+	struct Connection {
+		Connection( TCPSocketRef socket, TransportReceiverTCP* transport );
+		Connection( const Connection &other ) = delete;
+		Connection& operator=( const Connection &other ) = delete;
+		Connection( Connection &&other ) noexcept;
+		Connection& operator=( Connection &&other ) noexcept;
+		
+		~Connection();
+		
+		asio::ip::tcp::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
+		asio::ip::tcp::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
+		
+		void read();
+		static std::pair<iterator, bool> readMatchCondition( iterator begin, iterator end );
+		void onReadComplete( const asio::error_code &error, size_t bytesTransferred );
+		void close();
+		
+		TCPSocketRef			mSocket;
+		TransportReceiverTCP*	mTransport;
+		asio::streambuf			mBuffer;
+		std::vector<uint8_t>	mDataBuffer;
+	};
 	
 	asio::io_service			&mIoService;
 	std::mutex					mDataHandlerMutex, mConnectionMutex;

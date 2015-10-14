@@ -15,39 +15,40 @@ using namespace asio::ip;
 namespace osc {
 	
 TransportSenderUDP::TransportSenderUDP( WriteHandler writeHandler, const udp::endpoint &localEndpoint, const udp::endpoint &remoteEndpoint, asio::io_service &service )
-: mSocket( new udp::socket( service, localEndpoint ) ), mRemoteEndpoint( remoteEndpoint )
+: TransportSenderBase( writeHandler ), mSocket( new udp::socket( service, localEndpoint ) ), mRemoteEndpoint( remoteEndpoint )
 {
 	socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
-	mWriteHandler = writeHandler;
 }
 	
 TransportSenderUDP::TransportSenderUDP( WriteHandler writeHandler, const UDPSocketRef &socket, const asio::ip::udp::endpoint &remoteEndpoint )
-: mSocket( socket ), mRemoteEndpoint( remoteEndpoint )
+: TransportSenderBase( writeHandler ), mSocket( socket ), mRemoteEndpoint( remoteEndpoint )
 {
-	mWriteHandler = writeHandler;
 }
 	
 void TransportSenderUDP::send( std::shared_ptr<std::vector<uint8_t>> data )
 {
-	mSocket->async_send_to( asio::buffer( *data ), mRemoteEndpoint,
+	mSocket->async_send_to( asio::buffer( data->data() + 4, data->size() - 4 ), mRemoteEndpoint,
 	[&, data]( const asio::error_code& error, size_t bytesTransferred ) {
 		   mWriteHandler( error, bytesTransferred, data );
 	});
 }
 	
+void TransportSenderUDP::close()
+{
+	mSocket->close();
+}
+	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio::ip::udp::endpoint &localEndpoint, asio::io_service &service )
-: TransportReceiverBase( 4096 ), mSocket( new udp::socket( service, localEndpoint ) )
+: TransportReceiverBase( dataHandler ), mSocket( new udp::socket( service, localEndpoint ) ), mAmountToReceive( 4096 )
 {
 	asio::socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
-	mDataHandler = dataHandler;
 }
 	
 TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket )
-: TransportReceiverBase( 4096 ), mSocket( socket )
+: TransportReceiverBase( dataHandler ), mSocket( socket ), mAmountToReceive( 4096 )
 {
-	mDataHandler = dataHandler;
 }
 	
 void TransportReceiverUDP::listen()

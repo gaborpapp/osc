@@ -53,51 +53,26 @@ public:
 	//! Appends an OSC message to this bundle. The message is immediately copied
 	//! into this bundle and any changes to the message after the call to this
 	//! function does not affect this bundle.
-	//!
-	//! @param[in] message A pointer to tnyosc::Message.
 	void append( const TransportData &message ) { append_data( message.byteArray() ); }
 	
 	/// Sets timestamp of the bundle.
-	///
-	/// @param[in] ntp_time NTP Timestamp
-	/// @see get_current_ntp_time
 	void set_timetag( uint64_t ntp_time );
 	
-	/// Returns a complete byte array of this OSC bundle as a tnyosc::ByteBuffer
-	/// type.
-	///
-	/// @return The OSC bundle as a tnyosc::ByteBuffer.
-	/// @see data
-	/// @see size
-	const ByteBuffer& byteBuffer() const { return mDataBuffer; }
+	//! Returns a complete byte array of this OSC bundle type.
+	const ByteBuffer& byteBuffer() const { return *mDataBuffer; }
 	
-	/// Returns the size of this OSC bundle.
-	///
-	/// @return Size of the OSC bundle in bytes.
-	/// @see byte_array
-	/// @see data
-	size_t size() const override { return mDataBuffer.size(); }
+	//! Returns the size of this OSC bundle.
+	size_t size() const override { return mDataBuffer->size(); }
 	
-	/// Clears the bundle.
-	void clear() { mDataBuffer.clear(); }
+	//! Clears the bundle.
+	void clear() { mDataBuffer->clear(); }
 	
 private:
-	ByteBuffer mDataBuffer;
+	ByteBufferRef mDataBuffer;
 	
 	/// Returns a pointer to the byte array of this OSC bundle. This call is
 	/// convenient for actually sending this OSC bundle.
-	///
-	/// @return The OSC bundle as an char*.
-	/// @see byte_array
-	/// @see size
-	///
-	/// <pre>
-	///   int sockfd; // initialize UDP socket...
-	///   tnyosc::Bundle* bundle; // create a OSC bundle...
-	///   send_to(sockfd, bundle->data(), bundle->size(), 0);
-	/// </pre>
-	///
-	ByteBufferRef getSharedBuffer() const override { return ByteBufferRef( new ByteBuffer( mDataBuffer ) ); }
+	ByteBufferRef getSharedBuffer() const override;
 	
 	void append_data( const ByteBuffer& data );
 };

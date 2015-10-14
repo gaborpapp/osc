@@ -18,13 +18,8 @@ public:
 	
 	//! Sends the data array /a data to the remote endpoint using the udp socket, asynchronously.
 	void send( std::shared_ptr<std::vector<uint8_t>> data ) override;
-	
-	//! Returns the underlying udp socket associated with this transport.
-	const UDPSocketRef& getSocket() const { return mSocket; }
-	//! Returns the local udp endpoint associated with the socket.
-	asio::ip::udp::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
-	//! Returns a const reference to the remote udp endpoint this transport is sending to.
-	const asio::ip::udp::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
+	//!
+	void close();
 	
 	//! Returns the local address of the endpoint associated with this socket.
 	asio::ip::address getLocalAddress() const override { return mSocket->local_endpoint().address(); }
@@ -50,7 +45,9 @@ class TransportReceiverUDP : public TransportReceiverBase {
 public:
 	virtual ~TransportReceiverUDP() = default;
 	
+	//!
 	void listen() override;
+	//!
 	void close() override;
 	
 	//! Returns the underlying udp socket associated with this transport.
@@ -63,6 +60,8 @@ protected:
 	TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket );
 	
 	UDPSocketRef			mSocket;
+	asio::streambuf			mBuffer;
+	uint32_t				mAmountToReceive;
 	
 	friend class ReceiverUDP;
 };

@@ -298,11 +298,11 @@ void Message::createCache() const
 	
 	size_t typesArrayLen = typesArray.size();
 	ByteArray<4> sizeArray;
-	auto messageSize = (int*)sizeArray.data();
-	*messageSize = addressLen + typesArrayLen + mDataBuffer.size();
-	std::cout << "Expected size: " << *messageSize << std::endl;
+	int32_t messageSize = addressLen + typesArrayLen + mDataBuffer.size();
+	auto endianSize = htonl( messageSize );
+	memcpy( sizeArray.data(), reinterpret_cast<uint8_t*>( &endianSize ), 4 );
 	
-	mCache->resize( 4 + *messageSize );
+	mCache->resize( 4 + messageSize );
 	
 	std::copy( sizeArray.begin(),	sizeArray.end(),	mCache->begin() );
 	std::copy( mAddress.begin(),	mAddress.end(),		mCache->begin() + 4 );
