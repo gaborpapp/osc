@@ -55,31 +55,31 @@ protected:
 	ErrorHandler							mErrorHandler;
 };
 	
-class ReceiverUDP : public ReceiverBase {
+class ReceiverUdp : public ReceiverBase {
 public:
-	ReceiverUDP( uint16_t port,
+	ReceiverUdp( uint16_t port,
 				 const asio::ip::udp &protocol = asio::ip::udp::v4(),
 				 asio::io_service &io = ci::app::App::get()->io_service()  );
-	ReceiverUDP( const asio::ip::udp::endpoint &localEndpoint,
+	ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint,
 				 asio::io_service &io = ci::app::App::get()->io_service() );
-	ReceiverUDP( UDPSocketRef socket );
+	ReceiverUdp( UdpSocketRef socket );
 	
-	virtual ~ReceiverUDP() = default;
+	virtual ~ReceiverUdp() = default;
 	
 protected:
 	
 };
 	
-class ReceiverTCP : public ReceiverBase {
+class ReceiverTcp : public ReceiverBase {
 public:
-	ReceiverTCP( uint16_t port,
+	ReceiverTcp( uint16_t port,
 				 const asio::ip::tcp &protocol = asio::ip::tcp::v4(),
 				 asio::io_service &io = ci::app::App::get()->io_service()  );
-	ReceiverTCP( const asio::ip::tcp::endpoint &localEndpoint,
+	ReceiverTcp( const asio::ip::tcp::endpoint &localEndpoint,
 				 asio::io_service &io = ci::app::App::get()->io_service() );
 	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
 	
-	~ReceiverTCP() = default;
+	~ReceiverTcp() = default;
 };
 
 }

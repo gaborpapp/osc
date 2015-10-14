@@ -20,50 +20,45 @@ using namespace asio::ip;
 using namespace std::placeholders;
 
 namespace osc {
-	
-shared_ptr<vector<uint8_t>> createSharedByteBuffer( const Message &message )
-{
-	return shared_ptr<vector<uint8_t>>( new vector<uint8_t>( std::move( message.byteArray() ) ) );
-}
 
-SenderUDP::SenderUDP( uint16_t localPort, const std::string &host, uint16_t port, const udp &protocol, io_service &io )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUDP(
-	std::bind( &SenderUDP::writeHandler, this, _1, _2, _3 ),
+SenderUdp::SenderUdp( uint16_t localPort, const std::string &host, uint16_t port, const udp &protocol, io_service &io )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUdp(
+	std::bind( &SenderUdp::writeHandler, this, _1, _2, _3 ),
 	ip::udp::endpoint( protocol, localPort ),
 	ip::udp::endpoint( address::from_string( host ), port ),
 	io ) ) )
 {
 }
 	
-SenderUDP::SenderUDP( uint16_t localPort, const udp::endpoint &destination, const udp &protocol, io_service &io )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUDP(
-	std::bind( &SenderUDP::writeHandler, this, _1, _2, _3 ),
+SenderUdp::SenderUdp( uint16_t localPort, const udp::endpoint &destination, const udp &protocol, io_service &io )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUdp(
+	std::bind( &SenderUdp::writeHandler, this, _1, _2, _3 ),
 	ip::udp::endpoint( protocol, localPort ),
 	destination,
 	io ) ) )
 {
 }
 	
-SenderUDP::SenderUDP( const UDPSocketRef &socket, const udp::endpoint &destination )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUDP(
-	std::bind( &SenderUDP::writeHandler, this, _1, _2, _3 ),
+SenderUdp::SenderUdp( const UdpSocketRef &socket, const udp::endpoint &destination )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderUdp(
+	std::bind( &SenderUdp::writeHandler, this, _1, _2, _3 ),
 	socket,
 	destination ) ) )
 {
 }
 	
-SenderTCP::SenderTCP( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const tcp &protocol , io_service &io )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTCP(
-	std::bind( &SenderTCP::writeHandler, this, _1, _2, _3 ),
+SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const tcp &protocol , io_service &io )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTcp(
+	std::bind( &SenderTcp::writeHandler, this, _1, _2, _3 ),
 	ip::tcp::endpoint( protocol, localPort ),
 	ip::tcp::endpoint( address::from_string( destinationHost ), destinationPort ),
 	io ) )  )
 {
 }
 	
-SenderTCP::SenderTCP( uint16_t localPort,  const tcp::endpoint &destination, const tcp &protocol, io_service &io )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTCP(
-	std::bind( &SenderTCP::writeHandler, this, _1, _2, _3 ),
+SenderTcp::SenderTcp( uint16_t localPort,  const tcp::endpoint &destination, const tcp &protocol, io_service &io )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTcp(
+	std::bind( &SenderTcp::writeHandler, this, _1, _2, _3 ),
 	ip::tcp::endpoint( protocol, localPort ),
 	destination,
 	io ) )  )
@@ -71,9 +66,9 @@ SenderTCP::SenderTCP( uint16_t localPort,  const tcp::endpoint &destination, con
 	
 }
 
-SenderTCP::SenderTCP( const TCPSocketRef &socket, const tcp::endpoint &destination )
-: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTCP(
-	std::bind( &SenderTCP::writeHandler, this, _1, _2, _3 ),
+SenderTcp::SenderTcp( const TcpSocketRef &socket, const tcp::endpoint &destination )
+: SenderBase( std::unique_ptr<TransportSenderBase>( new TransportSenderTcp(
+	std::bind( &SenderTcp::writeHandler, this, _1, _2, _3 ),
 	socket,
 	destination ) )  )
 {
@@ -85,15 +80,20 @@ SenderBase::SenderBase( std::unique_ptr<TransportSenderBase> transport )
 {
 }
 	
-void SenderTCP::connect()
+void SenderTcp::connect()
 {
-	auto transportTCP = dynamic_cast<TransportSenderTCP*>(mTransportSender.get());
+	auto transportTCP = dynamic_cast<TransportSenderTcp*>(mTransportSender.get());
 	transportTCP->connect();
 }
 	
-void SenderBase::send( const TransportData &message )
+void SenderBase::send( const Message &message )
 {
 	mTransportSender->send( message.getSharedBuffer() );
+}
+	
+void SenderBase::send( const Bundle &bundle )
+{
+	mTransportSender->send( bundle.getSharedBuffer() );
 }
 	
 void SenderBase::writeHandler( const error_code &error, size_t bytesTransferred, shared_ptr<vector<uint8_t>> byte_buffer )

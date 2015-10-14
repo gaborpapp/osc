@@ -42,7 +42,7 @@ namespace osc {
 	
 /// This class represents an Open Sound Control bundle message. A bundle can
 /// contain any number of Message and Bundle.
-class Bundle : public TransportData {
+class Bundle {
 public:
 	
 	//! Creates a OSC bundle with timestamp set to immediate. Call set_timetag to
@@ -53,16 +53,17 @@ public:
 	//! Appends an OSC message to this bundle. The message is immediately copied
 	//! into this bundle and any changes to the message after the call to this
 	//! function does not affect this bundle.
-	void append( const TransportData &message ) { append_data( message.byteArray() ); }
+	void append( const Message &message ) { append_data( message.byteArray() ); }
+	void append( const Bundle &bundle ) { append_data( bundle.byteBuffer() ); }
 	
 	/// Sets timestamp of the bundle.
 	void set_timetag( uint64_t ntp_time );
 	
 	//! Returns a complete byte array of this OSC bundle type.
-	const ByteBuffer& byteBuffer() const { return *mDataBuffer; }
+	const ByteBuffer& byteBuffer() const { return *getSharedBuffer(); }
 	
 	//! Returns the size of this OSC bundle.
-	size_t size() const override { return mDataBuffer->size(); }
+	size_t size() const { return mDataBuffer->size(); }
 	
 	//! Clears the bundle.
 	void clear() { mDataBuffer->clear(); }
@@ -72,9 +73,11 @@ private:
 	
 	/// Returns a pointer to the byte array of this OSC bundle. This call is
 	/// convenient for actually sending this OSC bundle.
-	ByteBufferRef getSharedBuffer() const override;
+	ByteBufferRef getSharedBuffer() const;
 	
 	void append_data( const ByteBuffer& data );
+	
+	friend class SenderBase;
 };
 	
 }

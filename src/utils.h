@@ -73,8 +73,8 @@
 
 namespace osc {
 	
-using UDPSocketRef = std::shared_ptr<asio::ip::udp::socket>;
-using TCPSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
+using UdpSocketRef = std::shared_ptr<asio::ip::udp::socket>;
+using TcpSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
 	
 /// Convert 32-bit float to a big-endian network format
 inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
@@ -86,24 +86,10 @@ inline double ntohf( int32_t x ) { x = ntohl( x ); return *(float*) &x; }
 inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
 
 /// A byte array type internally used in the tnyosc library.
-using ByteBuffer = std::vector<uint8_t>;
 template<size_t size>
 using ByteArray = std::array<uint8_t, size>;
+using ByteBuffer = std::vector<uint8_t>;
 using ByteBufferRef = std::shared_ptr<ByteBuffer>;
-	
-class TransportData {
-public:
-	virtual ~TransportData() = default;
-	virtual const ByteBuffer& byteArray() const = 0;
-	virtual size_t size() const = 0;
-	virtual void clear() = 0;
-protected:
-	TransportData() = default;
-	
-	virtual ByteBufferRef getSharedBuffer() const = 0;
-	
-	friend class SenderBase;
-};
 	
 enum class ArgType {
 	INTEGER_32,

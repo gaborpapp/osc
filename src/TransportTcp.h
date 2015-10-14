@@ -4,9 +4,9 @@
 
 namespace osc {
 	
-class TransportSenderTCP : public TransportSenderBase {
+class TransportSenderTcp : public TransportSenderBase {
 public:
-	virtual ~TransportSenderTCP() = default;
+	virtual ~TransportSenderTcp() = default;
 	
 	void connect();
 	//! Sends \a message to the destination endpoint.
@@ -20,27 +20,27 @@ public:
 	
 	
 protected:
-	TransportSenderTCP(	WriteHandler handler,
+	TransportSenderTcp(	WriteHandler handler,
 						const asio::ip::tcp::endpoint &localEndpoint,
 						const asio::ip::tcp::endpoint &remoteEndpoint,
 						asio::io_service &io );
-	TransportSenderTCP( WriteHandler writeHandler,
-						const TCPSocketRef &socket,
+	TransportSenderTcp( WriteHandler writeHandler,
+						const TcpSocketRef &socket,
 						const asio::ip::tcp::endpoint &remoteEndpoint );
 	
 	void onConnect( const asio::error_code &error );
 	
-	TCPSocketRef			mSocket;
+	TcpSocketRef			mSocket;
 	asio::ip::tcp::endpoint mRemoteEndpoint;
 	
-	friend class SenderTCP;
+	friend class SenderTcp;
 };
 	
 using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
 
-class TransportReceiverTCP : public TransportReceiverBase {
+class TransportReceiverTcp : public TransportReceiverBase {
 public:
-	virtual ~TransportReceiverTCP() = default;
+	virtual ~TransportReceiverTcp() = default;
 	
 	void listen() override;
 	void close() override;
@@ -48,17 +48,17 @@ public:
 	asio::ip::address getLocalAddress() const override { return mAcceptor.local_endpoint().address(); }
 	
 protected:
-	TransportReceiverTCP( DataHandler dataHandler,
+	TransportReceiverTcp( DataHandler dataHandler,
 						  const asio::ip::tcp::endpoint &localEndpoint,
 						  asio::io_service &service );
-	TransportReceiverTCP( DataHandler dataHandler, const TCPSocketRef &socket );
+	TransportReceiverTcp( DataHandler dataHandler, const TcpSocketRef &socket );
 	
-	void onAccept( TCPSocketRef socket, const asio::error_code &error );
+	void onAccept( TcpSocketRef socket, const asio::error_code &error );
 	void onRead( const asio::error_code &error, size_t bytesTransferred );
 	bool readComplete( const asio::error_code &error, size_t bytesTransferred );
 	
 	struct Connection {
-		Connection( TCPSocketRef socket, TransportReceiverTCP* transport );
+		Connection( TcpSocketRef socket, TransportReceiverTcp* transport );
 		Connection( const Connection &other ) = delete;
 		Connection& operator=( const Connection &other ) = delete;
 		Connection( Connection &&other ) noexcept;
@@ -74,8 +74,8 @@ protected:
 		void onReadComplete( const asio::error_code &error, size_t bytesTransferred );
 		void close();
 		
-		TCPSocketRef			mSocket;
-		TransportReceiverTCP*	mTransport;
+		TcpSocketRef			mSocket;
+		TransportReceiverTcp*	mTransport;
 		asio::streambuf			mBuffer;
 		std::vector<uint8_t>	mDataBuffer;
 	};
@@ -85,7 +85,7 @@ protected:
 	asio::ip::tcp::acceptor		mAcceptor;
 	std::vector<Connection>		mConnections;
 	
-	friend class ReceiverTCP;
+	friend class ReceiverTcp;
 	friend class Connection;
 };
 

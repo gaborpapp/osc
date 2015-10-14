@@ -13,9 +13,6 @@
 
 namespace osc {
 	
-class Sender;
-class Receiver;
-	
 class TransportSenderBase {
 public:
 	using WriteHandler = std::function<void(const asio::error_code &/*error*/,

@@ -24,8 +24,8 @@ class TestApp : public App {
 	void update() override;
 	void draw() override;
 	
-	osc::ReceiverTCP	mReceiver;
-	osc::SenderTCP		mSender;
+	osc::ReceiverTcp	mReceiver;
+	osc::SenderTcp		mSender;
 	
 	bool mIsConnected = false;
 };

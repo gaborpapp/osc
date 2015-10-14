@@ -42,7 +42,7 @@ namespace osc {
 /// This class represents an Open Sound Control message. It supports Open Sound
 /// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
 /// in http://opensoundcontrol.org/spec-1_0.
-class Message : public TransportData {
+class Message {
 public:
 	
 	//! Create an OSC message.
@@ -134,17 +134,17 @@ public:
 	/// @return The OSC message as a ByteArray.
 	/// @see data
 	/// @see size
-	const ByteBuffer& byteArray() const override;
+	const ByteBuffer& byteArray() const;
 	
 	/// Returns the size of this OSC message.
 	///
 	/// @return Size of the OSC message in bytes.
 	/// @see byte_array
 	/// @see data
-	size_t size() const override;
+	size_t size() const;
 	
 	/// Clears the message.
-	void clear() override;
+	void clear();
 	
 private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }

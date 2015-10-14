@@ -25,7 +25,8 @@ public:
 	~SenderBase() = default;
 	
 	//! Sends \a message to the destination endpoint.
-	void send( const TransportData &message );
+	void send( const Message &message );
+	void send( const Bundle &bundle );
 	
 	//! Adds a handler to be called if there are errors with the asynchronous receive.
 	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
@@ -36,6 +37,7 @@ public:
 	
 protected:
 	SenderBase( std::unique_ptr<TransportSenderBase> transport );
+	
 	//!
 	void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> byte_buffer );
 	
@@ -43,18 +45,18 @@ protected:
 	ErrorHandler							mErrorHandler;
 };
 	
-class SenderUDP : public SenderBase {
+class SenderUdp : public SenderBase {
 public:
-	SenderUDP( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
-	SenderUDP( uint16_t localPort,  const asio::ip::udp::endpoint &destination, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
-	SenderUDP( const UDPSocketRef &socket, const asio::ip::udp::endpoint &destination );
+	SenderUdp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	SenderUdp( uint16_t localPort,  const asio::ip::udp::endpoint &destination, const asio::ip::udp &protocol = asio::ip::udp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	SenderUdp( const UdpSocketRef &socket, const asio::ip::udp::endpoint &destination );
 };
 	
-class SenderTCP : public SenderBase {
+class SenderTcp : public SenderBase {
 public:
-	SenderTCP( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const asio::ip::tcp &protocol = asio::ip::tcp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
-	SenderTCP( uint16_t localPort,  const asio::ip::tcp::endpoint &destination, const asio::ip::tcp &protocol = asio::ip::tcp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
-	SenderTCP( const TCPSocketRef &socket, const asio::ip::tcp::endpoint &destination );
+	SenderTcp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const asio::ip::tcp &protocol = asio::ip::tcp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	SenderTcp( uint16_t localPort,  const asio::ip::tcp::endpoint &destination, const asio::ip::tcp &protocol = asio::ip::tcp::v4(), asio::io_service &io = ci::app::App::get()->io_service() );
+	SenderTcp( const TcpSocketRef &socket, const asio::ip::tcp::endpoint &destination );
 	
 	void connect();
 };

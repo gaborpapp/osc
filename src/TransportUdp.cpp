@@ -1,12 +1,12 @@
 //
-//  ClientUDP.cpp
+//  ClientUdp.cpp
 //  Test
 //
 //  Created by ryan bartley on 9/11/15.
 //
 //
 
-#include "TransportUDP.h"
+#include "TransportUdp.h"
 
 using namespace std;
 using namespace asio;
@@ -14,19 +14,19 @@ using namespace asio::ip;
 
 namespace osc {
 	
-TransportSenderUDP::TransportSenderUDP( WriteHandler writeHandler, const udp::endpoint &localEndpoint, const udp::endpoint &remoteEndpoint, asio::io_service &service )
+TransportSenderUdp::TransportSenderUdp( WriteHandler writeHandler, const udp::endpoint &localEndpoint, const udp::endpoint &remoteEndpoint, io_service &service )
 : TransportSenderBase( writeHandler ), mSocket( new udp::socket( service, localEndpoint ) ), mRemoteEndpoint( remoteEndpoint )
 {
 	socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
 }
 	
-TransportSenderUDP::TransportSenderUDP( WriteHandler writeHandler, const UDPSocketRef &socket, const asio::ip::udp::endpoint &remoteEndpoint )
+TransportSenderUdp::TransportSenderUdp( WriteHandler writeHandler, const UdpSocketRef &socket, const udp::endpoint &remoteEndpoint )
 : TransportSenderBase( writeHandler ), mSocket( socket ), mRemoteEndpoint( remoteEndpoint )
 {
 }
 	
-void TransportSenderUDP::send( std::shared_ptr<std::vector<uint8_t>> data )
+void TransportSenderUdp::send( std::shared_ptr<std::vector<uint8_t>> data )
 {
 	mSocket->async_send_to( asio::buffer( data->data() + 4, data->size() - 4 ), mRemoteEndpoint,
 	[&, data]( const asio::error_code& error, size_t bytesTransferred ) {
@@ -34,24 +34,24 @@ void TransportSenderUDP::send( std::shared_ptr<std::vector<uint8_t>> data )
 	});
 }
 	
-void TransportSenderUDP::close()
+void TransportSenderUdp::close()
 {
 	mSocket->close();
 }
 	
-TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const asio::ip::udp::endpoint &localEndpoint, asio::io_service &service )
+TransportReceiverUdp::TransportReceiverUdp( DataHandler dataHandler, const udp::endpoint &localEndpoint, asio::io_service &service )
 : TransportReceiverBase( dataHandler ), mSocket( new udp::socket( service, localEndpoint ) ), mAmountToReceive( 4096 )
 {
 	asio::socket_base::reuse_address reuse( true );
 	mSocket->set_option( reuse );
 }
 	
-TransportReceiverUDP::TransportReceiverUDP( DataHandler dataHandler, const UDPSocketRef &socket )
+TransportReceiverUdp::TransportReceiverUdp( DataHandler dataHandler, const UdpSocketRef &socket )
 : TransportReceiverBase( dataHandler ), mSocket( socket ), mAmountToReceive( 4096 )
 {
 }
 	
-void TransportReceiverUDP::listen()
+void TransportReceiverUdp::listen()
 {
 	auto tempBuffer = mBuffer.prepare( mAmountToReceive );
 	
@@ -67,7 +67,7 @@ void TransportReceiverUDP::listen()
 	});
 }
 	
-void TransportReceiverUDP::close()
+void TransportReceiverUdp::close()
 {
 	mSocket->close();
 }

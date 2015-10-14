@@ -21,40 +21,40 @@ using namespace std::placeholders;
 
 namespace osc {
 	
-ReceiverUDP::ReceiverUDP( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
-: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
-	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUdp(
+	std::bind( &ReceiverUdp::receiveHandler, this, _1, _2, _3 ),
 	asio::ip::udp::endpoint( protocol, port ),
 	io ) ) )
 {
 }
 
-ReceiverUDP::ReceiverUDP( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
-: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
-	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+ReceiverUdp::ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUdp(
+	std::bind( &ReceiverUdp::receiveHandler, this, _1, _2, _3 ),
 	localEndpoint,
 	io ) ) )
 {
 }
 
-ReceiverUDP::ReceiverUDP( UDPSocketRef socket )
-: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUDP(
-	std::bind( &ReceiverUDP::receiveHandler, this, _1, _2, _3 ),
+ReceiverUdp::ReceiverUdp( UdpSocketRef socket )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverUdp(
+	std::bind( &ReceiverUdp::receiveHandler, this, _1, _2, _3 ),
 	socket ) ) )
 {
 }
 
-ReceiverTCP::ReceiverTCP( uint16_t port, const asio::ip::tcp &protocol, asio::io_service &io  )
-: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTCP(
-	std::bind( &ReceiverTCP::receiveHandler, this, _1, _2, _3 ),
+ReceiverTcp::ReceiverTcp( uint16_t port, const asio::ip::tcp &protocol, asio::io_service &io  )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTcp(
+	std::bind( &ReceiverTcp::receiveHandler, this, _1, _2, _3 ),
 	asio::ip::tcp::endpoint( protocol, port ),
 	io ) ) )
 {
 }
 
-ReceiverTCP::ReceiverTCP( const asio::ip::tcp::endpoint &localEndpoint, asio::io_service &io )
-: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTCP(
-	std::bind( &ReceiverTCP::receiveHandler, this, _1, _2, _3 ),
+ReceiverTcp::ReceiverTcp( const asio::ip::tcp::endpoint &localEndpoint, asio::io_service &io )
+: ReceiverBase( std::unique_ptr<TransportReceiverBase>( new TransportReceiverTcp(
+	std::bind( &ReceiverTcp::receiveHandler, this, _1, _2, _3 ),
 	localEndpoint,
 	io ) ) )
 {
