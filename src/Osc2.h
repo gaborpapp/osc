@@ -18,11 +18,6 @@ public:
 										 const std::string & /*socketAddress*/,
 										 const std::string & /*error*/)>;
 	
-	SenderBase( const SenderBase &other ) = delete;
-	SenderBase& operator=( const SenderBase &other ) = delete;
-	SenderBase( SenderBase &&other ) = default;
-	SenderBase& operator=( SenderBase &&other ) = default;
-	
 	//! Sends \a message to the destination endpoint.
 	void send( const Message &message ) { sendImpl( message.getSharedBuffer() ); }
 	void send( const Bundle &bundle ) { sendImpl( bundle.getSharedBuffer() );}
@@ -33,8 +28,6 @@ public:
 	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
 	
 protected:
-	~SenderBase() = default;
-	
 	//!
 	void writeHandler( const asio::error_code &error, size_t bytesTransferred, std::shared_ptr<std::vector<uint8_t>> byte_buffer );
 	
@@ -42,6 +35,14 @@ protected:
 	virtual void closeImpl() = 0;
 	
 	ErrorHandler							mErrorHandler;
+	
+public:
+	SenderBase( const SenderBase &other ) = delete;
+	SenderBase& operator=( const SenderBase &other ) = delete;
+	SenderBase( SenderBase &&other ) = default;
+	SenderBase& operator=( SenderBase &&other ) = default;
+	
+	virtual ~SenderBase() = default;
 };
 	
 class ReceiverBase {
@@ -49,13 +50,6 @@ public:
 	using ErrorHandler = std::function<void( const std::string & )>;
 	using Listener = std::function<void( const Message &message )>;
 	using Listeners = std::vector<std::pair<std::string, Listener>>;
-	
-	ReceiverBase( const ReceiverBase &other ) = delete;
-	ReceiverBase& operator=( const ReceiverBase &other ) = delete;
-	ReceiverBase( ReceiverBase &&other ) = default;
-	ReceiverBase& operator=( ReceiverBase &&other ) = default;
-	
-	virtual ~ReceiverBase() = default;
 	
 	//! Commits the socket to asynchronously receive into the internal buffer. Uses receiveHandler, below, as the completion handler.
 	void		listen() { listenImpl(); }
@@ -86,6 +80,14 @@ protected:
 	Listeners								mListeners;
 	std::mutex								mListenerMutex;
 	ErrorHandler							mErrorHandler;
+	
+public:
+	ReceiverBase( const ReceiverBase &other ) = delete;
+	ReceiverBase& operator=( const ReceiverBase &other ) = delete;
+	ReceiverBase( ReceiverBase &&other ) = default;
+	ReceiverBase& operator=( ReceiverBase &&other ) = default;
+	
+	virtual ~ReceiverBase() = default;
 };
 	
 class SenderUdp : public SenderBase {
