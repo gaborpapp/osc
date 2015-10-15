@@ -206,7 +206,9 @@ private:
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 };
 
-	
+//! Convenient output operator for Message
 std::ostream& operator<<( std::ostream &os, const Message &rhs );
+	
+	
 	
 }

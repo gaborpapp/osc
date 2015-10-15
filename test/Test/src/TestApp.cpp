@@ -5,7 +5,8 @@
 
 //#include "Sender.h"
 //#include "Receiver.h"
-#include "Osc.h"
+//#include "Osc.h"
+#include "Osc2.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -34,8 +35,6 @@ class TestApp : public App {
 TestApp::TestApp()
 : App(), mReceiver( 10000 ), mSender( 12345, "127.0.0.1", 10000 )
 {
-	osc::SenderUdpTemp mSenderUdp( 10000, "", 124 );
-	osc::
 	mReceiver.listen();
 	mReceiver.setListener( "/app/1",
 						  []( const osc::Message &message ){
