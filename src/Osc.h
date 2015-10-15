@@ -1,20 +1,71 @@
+// Copyright (c) 2011 Toshiro Yamada
+// All rights reserved.
 //
-//  Sender.h
-//  Test
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
 //
-//  Created by ryan bartley on 9/4/15.
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. The name of the author may not be used to endorse or promote products
+//    derived from this software without specific prior written permission.
 //
-//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+// OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+// IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+/// @file tnyosc.hpp
+/// @brief tnyosc main (and only) header file
+/// @author Toshiro Yamada
+///
+/// tnyosc is a header-only Open Sound Control library written in C++ for
+/// creating OSC-compliant messages. tnyosc supports Open Sound Control 1.0 and
+/// 1.1 types and other nonstandard types, and bundles. Note that tnyosc does not
+/// include code to actually send or receive OSC messages.
 
 #pragma once
 
-#include "Utils.h"
+#include "asio/asio.hpp"
 
 namespace osc {
 	
-//! This class represents an Open Sound Control message. It supports Open Sound
-//! Control 1.0 and 1.1 specifications and extra non-standard arguments listed
-//! in http://opensoundcontrol.org/spec-1_0.
+//! Argument types suported by the Message class
+enum class ArgType { INTEGER_32, FLOAT, DOUBLE, STRING, BLOB, MIDI, TIME_TAG, INTEGER_64, BOOL_T, BOOL_F, CHAR, NULL_T, INFINITUM, NONE
+};
+	
+// Forward declarations
+class Message;
+using UdpSocketRef = std::shared_ptr<asio::ip::udp::socket>;
+using TcpSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
+
+/// A byte array type internally used in the tnyosc library.
+template<size_t size>
+using ByteArray = std::array<uint8_t, size>;
+using ByteBuffer = std::vector<uint8_t>;
+using ByteBufferRef = std::shared_ptr<ByteBuffer>;
+
+namespace decode {
+	//! Free function that decodes a complete OSC Packet into it's individual parts.
+	bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
+	//! Free function that decodes an individual message.
+	bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
+	//! Free function used to match the addresses of messages based on the OSC spec.
+	bool patternMatch( const std::string &lhs, const std::string &rhs );
+}
+	
+/// This class represents an Open Sound Control message. It supports Open Sound
+/// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
+/// in http://opensoundcontrol.org/spec-1_0.
 class Message {
 public:
 	
@@ -47,7 +98,7 @@ public:
 	//! Appends an OSC-timetag (NTP format) to the back of the message.
 	void appendTimeTag( uint64_t v );
 	//! Appends the current UTP timestamp to the back of the message.
-	void appendCurrentTime() { appendTimeTag( time::get_current_ntp_time() ); }
+	void appendCurrentTime();
 	//! Appends a 'T'(True) or 'F'(False) to the back of the message.
 	void append( bool v );
 	//! Appends a Null (or nil) to the back of the message.
@@ -177,7 +228,11 @@ private:
 	friend class SenderBase;
 	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
+	friend bool (decode::decodeMessage)( uint8_t *, uint32_t, std::vector<Message> &, uint64_t );
 };
+
+//! Convenient stream operator for Message
+std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	
 //! This class represents an Open Sound Control bundle message. A bundle can
 //! contain any number of Message and Bundle.
@@ -192,11 +247,12 @@ public:
 	//! Appends an OSC message to this bundle. The message is immediately copied
 	//! into this bundle and any changes to the message after the call to this
 	//! function does not affect this bundle.
+	// TODO: reimplement this so that it takes the shared buffer and get rid of bytebuffer.
 	void append( const Message &message ) { append_data( message.byteArray() ); }
 	void append( const Bundle &bundle ) { append_data( bundle.byteBuffer() ); }
 	
 	/// Sets timestamp of the bundle.
-	void set_timetag( uint64_t ntp_time );
+	void setTimetag( uint64_t ntp_time );
 	
 	//! Returns a complete byte array of this OSC bundle type.
 	const ByteBuffer& byteBuffer() const { return *getSharedBuffer(); }
@@ -218,81 +274,126 @@ private:
 	
 	friend class SenderBase;
 };
-	
-namespace detail { namespace decode {
-	bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
-	bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
-	bool patternMatch( const std::string &lhs, const std::string &rhs );
-}}
 
-template<typename TransportSender>
-class Sender : public TransportSender {
+//! SenderBase represents an OSC Sender(client in OSC terms) and implements a unified
+//! interface without implementing any of the networking layer.
+class SenderBase {
 public:
-	using protocol = typename TransportSender::protocol;
-	using endpoint = typename protocol::endpoint;
-	using SocketRef = std::shared_ptr<typename protocol::socket>;
-	
-	Sender( uint16_t localPort,
-			const std::string &destinationHost,
-			uint16_t destinationPort,
-			const protocol &protocol = protocol::v4(),
-			asio::io_service &service = ci::app::App::get()->io_service() )
-	: TransportSender( endpoint( protocol, localPort ),
-					   endpoint( asio::ip::address::from_string( destinationHost ), destinationPort ),
-					   service ) {}
-	
-	Sender( uint16_t localPort,
-			const endpoint &destination,
-			const protocol &protocol = typename protocol::v4(),
-		   asio::io_service &service = ci::app::App::get()->io_service() )
-	: TransportSender( endpoint( protocol, localPort ), destination, service ) {}
-	
-	Sender( const SocketRef &socket, const endpoint &destination )
-	: TransportSender( socket, destination ) {}
-	
-	Sender( const Sender &other ) = delete;
-	Sender& operator=( const Sender &other ) = delete;
-	Sender( Sender &&other ) = default;
-	Sender& operator=( Sender &&other ) = default;
-	~Sender() = default;
+	// TODO: Figure out error handling
+	using ErrorHandler = std::function<void( const std::string & /*oscAddress*/,
+										 const std::string & /*socketAddress*/,
+										 const std::string & /*error*/)>;
 	
 	//! Sends \a message to the destination endpoint.
-	void send( const Message &message ) { this->sendImpl( message.getSharedBuffer() ); }
-	void send( const Bundle &bundle ) { this->sendImpl( bundle.getSharedBuffer() ); }
+	void send( const Message &message ) { sendImpl( message.getSharedBuffer() ); }
+	//! Sends \a bundle to the destination endpoint.
+	void send( const Bundle &bundle ) { sendImpl( bundle.getSharedBuffer() ); }
+	//! Closes the underlying connection to the socket.
+	void close() { closeImpl(); }
 	
-	void close() { this->closeImpl(); }
+protected:
+	SenderBase() = default;
+	virtual ~SenderBase() = default;
+	SenderBase( const SenderBase &other ) = delete;
+	SenderBase& operator=( const SenderBase &other ) = delete;
+	SenderBase( SenderBase &&other ) = default;
+	SenderBase& operator=( SenderBase &&other ) = default;
 	
+	//! Abstract send function implemented by the network layer.
+	virtual void sendImpl( const ByteBufferRef &byteBuffer ) = 0;
+	//! Abstract close function implemented by the network layer
+	virtual void closeImpl() = 0;
+};
+	
+class SenderUdp : public SenderBase {
+public:
+	using protocol = asio::ip::udp;
+	SenderUdp( uint16_t localPort,
+			   const std::string &destinationHost,
+			   uint16_t destinationPort,
+			   const protocol &protocol = protocol::v4(),
+			   asio::io_service &service = ci::app::App::get()->io_service() );
+	SenderUdp( uint16_t localPort,
+			   const protocol::endpoint &destination,
+			   const protocol &protocol = protocol::v4(),
+			   asio::io_service &service = ci::app::App::get()->io_service() );
+	SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination );
+	
+	virtual ~SenderUdp() = default;
+	
+	//! Returns the local address of the endpoint associated with this socket.
+	protocol::endpoint getLocalAddress() const { return mSocket->local_endpoint(); }
+	//! Returns the remote address of the endpoint associated with this transport.
+	const protocol::endpoint& getRemoteAddress() const { return mRemoteEndpoint; }
+	
+protected:
+	//! Sends the byte buffer /a data to the remote endpoint using the udp socket, asynchronously.
+	void sendImpl( const ByteBufferRef &data ) override;
+	//! Closes the underlying udp socket.
+	void closeImpl() override { mSocket->close(); }
+	
+	UdpSocketRef			mSocket;
+	asio::ip::udp::endpoint mRemoteEndpoint;
+	
+public:
+	SenderUdp( const SenderUdp &other ) = delete;
+	SenderUdp& operator=( const SenderUdp &other ) = delete;
+	SenderUdp( SenderUdp &&other ) = default;
+	SenderUdp& operator=( SenderUdp &&other ) = default;
 };
 
-template<typename TransportReceiver>
-class Receiver : public TransportReceiver {
+class SenderTcp : public SenderBase {
 public:
+	using protocol = asio::ip::tcp;
+	SenderTcp( uint16_t localPort,
+			   const std::string &destinationHost,
+			   uint16_t destinationPort,
+			   const protocol &protocol = protocol::v4(),
+			   asio::io_service &service = ci::app::App::get()->io_service() );
+	SenderTcp( uint16_t localPort,
+			   const protocol::endpoint &destination,
+			   const protocol &protocol = protocol::v4(),
+			   asio::io_service &service = ci::app::App::get()->io_service() );
+	SenderTcp( const TcpSocketRef &socket, const asio::ip::tcp::endpoint &destination );
+	
+	virtual ~SenderTcp() = default;
+	
+	//! Connects to the remote endpoint using the underlying socket. Has to be called before attempting to send anything.
+	void connect();
+	
+	//! Returns the local address of the endpoint associated with this socket.
+	protocol::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
+	//! Returns the remote address of the endpoint associated with this transport.
+	const protocol::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
+	
+protected:
+	//! Sends the byte buffer /a data to the remote endpoint using the tcp socket, asynchronously.
+	void sendImpl( const ByteBufferRef &data ) override;
+	//! Closes the underlying tcp socket.
+	void closeImpl() override { mSocket->close(); }
+	
+	TcpSocketRef			mSocket;
+	asio::ip::tcp::endpoint mRemoteEndpoint;
+	
+public:
+	SenderTcp( const SenderTcp &other ) = delete;
+	SenderTcp& operator=( const SenderTcp &other ) = delete;
+	SenderTcp( SenderTcp &&other ) = default;
+	SenderTcp& operator=( SenderTcp &&other ) = default;
+};
+
+//! ReceiverBase represents an OSC Receiver(server in OSC terms) and implements a unified
+//! interface without implementing any of the networking layer.
+class ReceiverBase {
+public:
+	//! TODO: Figure out what to do with Error Handler
+	using ErrorHandler = std::function<void( const std::string & )>;
 	using Listener = std::function<void( const Message &message )>;
 	using Listeners = std::vector<std::pair<std::string, Listener>>;
 	
-	using protocol = typename TransportReceiver::protocol;
-	using endpoint = typename protocol::endpoint;
-	using SocketRef = std::shared_ptr<typename protocol::socket>;
-	
-	Receiver( uint16_t port,
-			  const protocol &protocol = protocol::v4(),
-			  asio::io_service &service = ci::app::App::get()->io_service()  )
-	: TransportReceiver( endpoint( protocol, port ), service ) { this->setMessageCompleteHandler( std::bind( &Receiver::messageCompleteHandler, this, std::placeholders::_1, std::placeholders::_2 ) ); }
-	Receiver( const endpoint &localEndpoint,
-			  asio::io_service &service = ci::app::App::get()->io_service() )
-	: TransportReceiver( localEndpoint, service ) { this->setMessageCompleteHandler( std::bind( &Receiver::messageCompleteHandler, this, std::placeholders::_1, std::placeholders::_2 ) ); }
-	Receiver( UdpSocketRef socket ) : TransportReceiver( socket ) { this->setMessageCompleteHandler( std::bind( &Receiver::messageCompleteHandler, this, std::placeholders::_1, std::placeholders::_2 ) ); }
-	
-	Receiver( const Receiver &other ) = delete;
-	Receiver& operator=( const Receiver &other ) = delete;
-	Receiver( Receiver &&other ) = default;
-	Receiver& operator=( Receiver &&other ) = default;
-	
-	virtual ~Receiver() = default;
-	
-	//! Commits the socket to asynchronously receive into the internal buffer. Uses receiveHandler, below, as the completion handler.
-	void		listen() { this->listenImpl(); }
-	void		close() { this->closeImpl(); }
+	//! Commits the socket to asynchronously listen and begin to receive from outside connections. Uses receiveHandler, below, as the completion handler.
+	void		listen() { listenImpl(); }
+	void		close() { closeImpl(); }
 	
 	//! Sets a callback, \a listener, to be called when receiving a message with \a address. If a listener exists for this address, \a listener will replace it.
 	void		setListener( const std::string &address, Listener listener );
@@ -300,244 +401,151 @@ public:
 	void		removeListener( const std::string &address );
 	
 protected:
-	//! Handles the async receive completion operations
-	void messageCompleteHandler( std::size_t bytesTransferred, asio::streambuf &streamBuf );
+	ReceiverBase() = default;
+	virtual ~ReceiverBase() = default;
+	ReceiverBase( const ReceiverBase &other ) = delete;
+	ReceiverBase& operator=( const ReceiverBase &other ) = delete;
+	ReceiverBase( ReceiverBase &&other ) = default;
+	ReceiverBase& operator=( ReceiverBase &&other ) = default;
+	
+	//! decodes and routes messages from the networking layers stream.
 	void dispatchMethods( uint8_t *data, uint32_t size );
+	
+	//! Implemented
+	virtual void listenImpl() = 0;
+	virtual void closeImpl() = 0;
 	
 	Listeners								mListeners;
 	std::mutex								mListenerMutex;
 };
 	
-namespace detail {
-	
-class TransportSenderUdp {
+//! ReceiverUdp represents an OSC Receiver(server in OSC terms) and implements the udp transport
+//!	networking layer.
+class ReceiverUdp : public ReceiverBase {
 public:
 	using protocol = asio::ip::udp;
-	using ErrorHandler = std::function<void( const std::string & /*oscAddress*/,
-											const std::string & /*socketAddress*/,
-											const std::string & /*error*/)>;
+	ReceiverUdp( uint16_t port,
+				 const protocol &protocol = protocol::v4(),
+				 asio::io_service &io = ci::app::App::get()->io_service()  );
+	ReceiverUdp( const protocol::endpoint &localEndpoint,
+				 asio::io_service &io = ci::app::App::get()->io_service() );
+	ReceiverUdp( UdpSocketRef socket );
 	
-	//! Returns the local address of the endpoint associated with this socket.
-	const asio::ip::udp::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
-	//! Returns the remote address of the endpoint associated with this transport.
-	asio::ip::udp::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
+	virtual ~ReceiverUdp() = default;
 	
-	void setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
-	void setWriteHandler( WriteHandler writeHandler ) { mWriteHandler = writeHandler; }
-	
-protected:
-	TransportSenderUdp( const protocol::endpoint &localEndpoint,
-				    const protocol::endpoint &remoteEndpoint,
-				    asio::io_service &service );
-	TransportSenderUdp( const UdpSocketRef &socket,
-				    const protocol::endpoint &remoteEndpoint );
-	
-	~TransportSenderUdp() = default;
-	
-	//! Sends the data array /a data to the remote endpoint using the Udp socket, asynchronously.
-	void sendImpl( std::shared_ptr<std::vector<uint8_t>> data );
-	//!
-	void closeImpl();
-	
-	UdpSocketRef			mSocket;
-	asio::ip::udp::endpoint mRemoteEndpoint;
-	
-	WriteHandler			mWriteHandler;
-	ErrorHandler			mErrorHandler;
-	
-	friend class SenderUdp;
-};
-
-class TransportReceiverUdp {
-public:
-	using protocol = asio::ip::udp;
-	using ErrorHandler = std::function<void( const std::string & )>;
-	
-	//! Returns the local endpoint of the endpoint associated with this socket.
-	asio::ip::udp::endpoint getLocalAddress() const { return mSocket->local_endpoint(); }
-	//! Adds a handler to be called if there are errors with the asynchronous receive.
-	void		setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
+	// TODO: Check to see that this is needed, see if we can't auto accept a size of datagram.
+	void setAmountToReceive( uint32_t amountToReceive ) { mAmountToReceive = amountToReceive; }
+	//! Returns the local udp::endpoint of the underlying socket.
+	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
 protected:
-	TransportReceiverUdp( const protocol::endpoint &localEndpoint, asio::io_service &service );
-	TransportReceiverUdp( const UdpSocketRef &socket );
-	~TransportReceiverUdp() = default;
-	
-	//! Implements listening on the socket
-	void listenImpl();
-	//! Implements close of the socket
-	void closeImpl();
-	//!
-	void setMessageCompleteHandler( MessageCompleteHandler messageCompleteHandler ) { mMessageCompleteHandler = messageCompleteHandler; }
+	//! Listens on the udp network socket for incoming datagrams. Handles the async receive completion operations. Any errors from asio are handled internally.
+	void listenImpl() override;
+	void closeImpl() override { mSocket->close(); }
 	
 	UdpSocketRef			mSocket;
 	asio::streambuf			mBuffer;
+	uint32_t				mAmountToReceive;
 	
-	MessageCompleteHandler	mMessageCompleteHandler;
-	ErrorHandler			mErrorHandler;
-	
-	friend class ReceiverUdp;
-};
-	
-class TransportSenderTcp {
 public:
-	
-	void connect();
-	//! Returns the local address of the endpoint associated with this socket.
-	const asio::ip::tcp::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
-	//! Returns the remote address of the endpoint associated with this transport.
-	asio::ip::tcp::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
-	
-//	void setErrorHandler( ErrorHandler errorHandler ) { mErrorHandler = errorHandler; }
-	void setWriteHandler( WriteHandler writeHandler ) { mWriteHandler = writeHandler; }
-	
-	//! Returns the local address of the endpoint associated with this socket.
-	asio::ip::address getLocalAddress() const  { return mSocket->local_endpoint().address(); }
-	//! Returns the remote address of the endpoint associated with this transport.
-	asio::ip::address getRemoteAddress() const { return mRemoteEndpoint.address(); }
-	
-	
-protected:
-	TransportSenderTcp(	const asio::ip::tcp::endpoint &localEndpoint,
-					   const asio::ip::tcp::endpoint &remoteEndpoint,
-					   asio::io_service &io );
-	TransportSenderTcp( const TcpSocketRef &socket,
-					   const asio::ip::tcp::endpoint &remoteEndpoint );
-	~TransportSenderTcp() = default;
-	
-	//! Sends \a message to the destination endpoint.
-	void sendImpl( std::shared_ptr<std::vector<uint8_t>> data );
-	void closeImpl();
-	
-	void onConnect( const asio::error_code &error );
-	
-	TcpSocketRef			mSocket;
-	asio::ip::tcp::endpoint mRemoteEndpoint;
-	
-	WriteHandler			mWriteHandler;
-
-	friend class SenderTcp;
+	ReceiverUdp( const ReceiverUdp &other ) = delete;
+	ReceiverUdp& operator=( const ReceiverUdp &other ) = delete;
+	ReceiverUdp( ReceiverUdp &&other ) = default;
+	ReceiverUdp& operator=( ReceiverUdp &&other ) = default;
 };
 
-using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
-
-class TransportReceiverTcp {
+//! ReceiverTcp represents an OSC Receiver(server in OSC terms) and implements the tcp transport
+//!	networking layer.
+class ReceiverTcp : public ReceiverBase {
 public:
-	virtual ~TransportReceiverTcp() = default;
-
-	asio::ip::address getLocalAddress() const { return mAcceptor.local_endpoint().address(); }
+	using protocol = asio::ip::tcp;
+	ReceiverTcp( uint16_t port,
+			 const protocol &protocol = protocol::v4(),
+			 asio::io_service &service = ci::app::App::get()->io_service()  );
+	ReceiverTcp( const protocol::endpoint &localEndpoint,
+			 asio::io_service &service = ci::app::App::get()->io_service() );
+	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
+	virtual ~ReceiverTcp() = default;
 	
 protected:
-	TransportReceiverTcp( DataHandler dataHandler,
-					  const asio::ip::tcp::endpoint &localEndpoint,
-					  asio::io_service &service );
-	TransportReceiverTcp( DataHandler dataHandler, const TcpSocketRef &socket );
-	
-	void listenImpl();
-	void closeImpl();
-	
-	void onAccept( TcpSocketRef socket, const asio::error_code &error );
-	void onRead( const asio::error_code &error, size_t bytesTransferred );
-	bool readComplete( const asio::error_code &error, size_t bytesTransferred );
-	
 	struct Connection {
-		Connection( TcpSocketRef socket, TransportReceiverTcp* transport );
-		Connection( const Connection &other ) = delete;
-		Connection& operator=( const Connection &other ) = delete;
-		Connection( Connection &&other ) noexcept;
-		Connection& operator=( Connection &&other ) noexcept;
+		Connection( TcpSocketRef socket, ReceiverTcp* transport );
 		
 		~Connection();
 		
 		asio::ip::tcp::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
 		asio::ip::tcp::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
 		
+		//! Implements the read on the underlying socket. Handles the async receive completion operations. Any errors from asio are handled internally.
 		void read();
+		//! Simple alias for asio buffer iterator type.
+		using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
+		//! Static method which is used to read the stream as it's coming in and notate each packet.
 		static std::pair<iterator, bool> readMatchCondition( iterator begin, iterator end );
-		void onReadComplete( const asio::error_code &error, size_t bytesTransferred );
-		void close();
+		//! Implements the close of this socket
+		void close() { mSocket->close(); }
 		
 		TcpSocketRef			mSocket;
-		TransportReceiverTcp*	mTransport;
+		ReceiverTcp*			mTransport;
 		asio::streambuf			mBuffer;
 		std::vector<uint8_t>	mDataBuffer;
+		
+		
+		Connection( const Connection &other ) = delete;
+		Connection& operator=( const Connection &other ) = delete;
+		Connection( Connection &&other ) noexcept;
+		Connection& operator=( Connection &&other ) noexcept;
 	};
 	
-	asio::io_service			&mIoService;
-	std::mutex					mDataHandlerMutex, mConnectionMutex;
-	asio::ip::tcp::acceptor		mAcceptor;
-	std::vector<Connection>		mConnections;
+	//! Listens on the underlying tcp network socket for incoming connections.
+	void listenImpl() override;
+	//! Implements the close operation for the underlying sockets and acceptor.
+	void closeImpl() override;
 	
-	friend class ReceiverTcp;
+	asio::io_service			&mIoService;
+	asio::ip::tcp::acceptor		mAcceptor;
+	
+	std::mutex					mDataHandlerMutex, mConnectionMutex;
+	std::vector<Connection>		mConnections;
+
 	friend class Connection;
+public:
+	ReceiverTcp( const ReceiverTcp &other ) = delete;
+	ReceiverTcp& operator=( const ReceiverTcp &other ) = delete;
+	ReceiverTcp( ReceiverTcp &&other ) = default;
+	ReceiverTcp& operator=( ReceiverTcp &&other ) = default;
 };
 	
-}
-	
-template<typename TransportReceiver>
-void Receiver<TransportReceiver>::setListener( const std::string &address, Listener listener )
-{
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-									  [address]( const std::pair<std::string, Listener> &listener ) {
-										  return address == listener.first;
-									  });
-	if( foundListener != mListeners.end() ) {
-		foundListener->second = listener;
-	}
-	else {
-		mListeners.push_back( { address, listener } );
-	}
-}
+//! Converts ArgType \a type to c-string for debug purposes.
+const char* argTypeToString( ArgType type );
 
-template<typename TransportReceiver>
-void Receiver<TransportReceiver>::removeListener( const std::string &address )
-{
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-									  [address]( const std::pair<std::string, Listener> &listener ) {
-										  return address == listener.first;
-									  });
-	if( foundListener != mListeners.end() ) {
-		mListeners.erase( foundListener );
-	}
-}
+namespace time {
+	uint64_t get_current_ntp_time();
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock();
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds );
+	//! Returns the system clock as NTP time.
+	uint64_t getSystemClock() { return get_current_ntp_time(); }
+	//! Returns the current presentation time as a string.
+	std::string getClockString( bool includeDate = true );
+	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
+	void setClock( uint64_t ntp_time );
 	
-template<typename TransportReceiver>
-void Receiver<TransportReceiver>::messageCompleteHandler( std::size_t bytesTransferred, asio::streambuf &streamBuf )
-{
-	auto data = new std::unique_ptr<uint8_t[]>( new uint8_t[bytesTransferred + 1] );
-	data[ bytesTransferred ] = 0;
-	std::istream stream( &streamBuf );
-	stream.read( (char*)data, bytesTransferred );
-	dispatchMethods( (uint8_t*)(data + 4), bytesTransferred );
-}
+};
+	
+class ExcIndexOutOfBounds : public ci::Exception {
+public:
+	ExcIndexOutOfBounds( const std::string &address, uint32_t index )
+	: Exception( std::string( std::to_string( index ) + " out of bounds from address, " + address ) )
+	{}
+};
 
-template<typename TransportReceiver>
-void Receiver<TransportReceiver>::dispatchMethods( uint8_t *data, uint32_t size )
-{
-	using namespace detail::decode;
-	std::vector<Message> messages;
-	
-	if( ! decodeData( data, size, messages ) ) return;
-	
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	// iterate through all the messages and find matches with registered methods
-	for( auto & message : messages ) {
-		bool dispatchedOnce = false;
-		for( auto & listener : mListeners ) {
-			if( patternMatch( message.getAddress(), listener.first ) ) {
-				listener.second( message );
-				dispatchedOnce = true;
-			}
-		}
-		if( ! dispatchedOnce ) {
-			
-		}
-	}
-}
-	
-using SenderUdpTemp = Sender<detail::TransportSenderUdp>;
-using ReceiverUdpTemp = Receiver<detail::TransportReceiverUdp>;
+class ExcNonConvertible : public ci::Exception {
+public:
+	ExcNonConvertible( const std::string &address, uint32_t index, ArgType actualType, ArgType convertToType )
+	: Exception( std::string( std::to_string( index ) + ": " + address + ", expected type: " + argTypeToString( convertToType ) + ", actual type: " + argTypeToString( actualType ) ) )
+	{}
+};
 	
 }

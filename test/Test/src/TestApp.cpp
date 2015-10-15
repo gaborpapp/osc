@@ -3,10 +3,7 @@
 #include "cinder/gl/gl.h"
 #include "cinder/Log.h"
 
-//#include "Sender.h"
-//#include "Receiver.h"
-//#include "Osc.h"
-#include "Osc2.h"
+#include "Osc.h"
 
 using namespace ci;
 using namespace ci::app;
