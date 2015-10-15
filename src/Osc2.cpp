@@ -43,7 +43,42 @@ using namespace asio;
 using namespace asio::ip;
 using namespace std::placeholders;
 
+// Following code snippets were taken from
+// http://www.jbox.dk/sanos/source/include/net/inet.h.html
+#ifndef htons
+#define htons(n) (((((uint16_t)(n) & 0xFF)) << 8) | (((uint16_t)(n) & 0xFF00) >> 8))
+#endif
+#ifndef ntohs
+#define ntohs(n) (((((uint16_t)(n) & 0xFF)) << 8) | (((uint16_t)(n) & 0xFF00) >> 8))
+#endif
+#ifndef htonl
+#define htonl(n) (((((uint32_t)(n) & 0xFF)) << 24) | ((((uint32_t)(n) & 0xFF00)) << 8) | ((((uint32_t)(n) & 0xFF0000)) >> 8) | ((((uint32_t)(n) & 0xFF000000)) >> 24))
+#endif
+#ifndef ntohl
+#define ntohl(n) (((((uint32_t)(n) & 0xFF)) << 24) | ((((uint32_t)(n) & 0xFF00)) << 8) | ((((uint32_t)(n) & 0xFF0000)) >> 8) | ((((uint32_t)(n) & 0xFF000000)) >> 24))
+#endif
+
+// Following ntohll() and htonll() code snippets were taken from
+// http://www.codeproject.com/KB/cpp/endianness.aspx?msg=1661457
+#ifndef ntohll
+/// Convert 64-bit little-endian integer to a big-endian network format
+#define ntohll(x) (((int64_t)(ntohl((int32_t)((x << 32) >> 32))) << 32) | (uint32_t)ntohl(((int32_t)(x >> 32))))
+#endif
+#ifndef htonll
+/// Convert 64-bit big-endian network format to a little-endian integer
+#define htonll(x) ntohll(x)
+#endif
+
 namespace osc {
+	
+/// Convert 32-bit float to a big-endian network format
+inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
+/// Convert 64-bit float (double) to a big-endian network format
+inline int64_t htond( double x ) { return (int64_t) htonll( *(int64_t*) &x ); }
+/// Convert 32-bit big-endian network format to float
+inline double ntohf( int32_t x ) { x = ntohl( x ); return *(float*) &x; }
+/// Convert 64-bit big-endian network format to double
+inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
 	
 ////////////////////////////////////////////////////////////////////////////////////////
 //// MESSAGE
@@ -56,13 +91,11 @@ Message::Message( const std::string& address )
 Message::Argument::Argument()
 : mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
 {
-	
 }
 
 Message::Argument::Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap )
 : mType( type ), mOffset( offset ), mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
 {
-	
 }
 
 ArgType Message::Argument::translateCharToArgType( char type )
@@ -694,17 +727,22 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 //// SenderTcp
 
 SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service )
-	: mSocket(), mRemoteEndpoint()
+: mSocket( new tcp::socket( service, tcp::endpoint( protocol, localPort ) ) ),
+	mRemoteEndpoint( tcp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
 	
 }
 	
 SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, io_service &service )
+: mSocket( new tcp::socket( service, tcp::endpoint( protocol, localPort ) ) ),
+	mRemoteEndpoint( destination )
+
 {
 	
 }
 
 SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination )
+: mSocket( socket ), mRemoteEndpoint( destination )
 {
 	
 }
@@ -776,7 +814,7 @@ bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages
 {
 	//	ParsedMessage m{ timetag, Message( std::string("") ) };
 	Message message;
-	if( ! message.bufferCache( (uint8_t*)data, size ) )
+	if( ! message.bufferCache( data, size ) )
 		return false;
 	
 	messages.push_back( std::move( message ) );
@@ -912,17 +950,6 @@ void ReceiverBase::removeListener( const std::string &address )
 	}
 }
 
-void ReceiverBase::receiveHandler( std::size_t bytesTransferred, asio::streambuf &streamBuf )
-{
-	auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
-	data[ bytesTransferred ] = 0;
-	istream stream( &streamBuf );
-	stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
-	// TODO: figure out whether we need this + 4, maybe there's someway to remove the size earlier from the streambuf
-	// right now it represents skipping the size.
-	dispatchMethods( (data.get() + 4), bytesTransferred );
-}
-
 void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
 {
 	using namespace decode;
@@ -979,7 +1006,13 @@ void ReceiverUdp::listenImpl()
 	[&]( const error_code &error, size_t bytesTransferred ) {
 		//! TODO: insert error handling.
 		mBuffer.commit( bytesTransferred );
-		receiveHandler( bytesTransferred, mBuffer );
+		auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
+		data[ bytesTransferred ] = 0;
+		istream stream( &mBuffer );
+		stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
+		// TODO: figure out whether we need this + 4, maybe there's someway to remove the size earlier from the streambuf
+		// right now it represents skipping the size.
+		dispatchMethods( data.get(), bytesTransferred );
 		if( ! error )
 			listen();
 		else
@@ -1042,9 +1075,13 @@ void ReceiverTcp::Connection::read()
 {
 	asio::async_read_until( *mSocket, mBuffer, &readMatchCondition,
 	[&]( const asio::error_code &error, size_t bytesTransferred ) {
+		auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
+		data[ bytesTransferred ] = 0;
+		istream stream( &mBuffer );
+		stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
 		{
 			std::lock_guard<std::mutex> lock( mTransport->mDataHandlerMutex );
-			mTransport->receiveHandler( bytesTransferred, mBuffer );
+			mTransport->dispatchMethods( (data.get() + 4), bytesTransferred );
 		}
 		// TODO: Figure these errors out.
 		read();
@@ -1070,7 +1107,7 @@ void ReceiverTcp::listenImpl()
 	if( ! mAcceptor.is_open() );
 	//		mAcceptor.open();
 	
-	mAcceptor.async_accept( *socket,
+	mAcceptor.async_accept( *socket, std::bind(
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
 		   CI_LOG_V("Accepted a connection");
 		   if( ! error ) {
@@ -1083,7 +1120,7 @@ void ReceiverTcp::listenImpl()
 			   CI_LOG_E(error.message());
 		   }
 		   listen();
-	});
+	}, socket, _1 ) );
 }
 
 void ReceiverTcp::closeImpl()
@@ -1095,4 +1132,102 @@ void ReceiverTcp::closeImpl()
 	}
 	mConnections.clear();
 }
+	
+const char* argTypeToString( ArgType type )
+{
+	switch ( type ) {
+		case ArgType::INTEGER_32: return "INTEGER_32"; break;
+		case ArgType::FLOAT: return "FLOAT"; break;
+		case ArgType::DOUBLE: return "DOUBLE"; break;
+		case ArgType::STRING: return "STRING"; break;
+		case ArgType::BLOB: return "BLOB"; break;
+		case ArgType::MIDI: return "MIDI"; break;
+		case ArgType::TIME_TAG: return "TIME_TAG"; break;
+		case ArgType::INTEGER_64: return "INTEGER_64"; break;
+		case ArgType::BOOL_T: return "BOOL_T"; break;
+		case ArgType::BOOL_F: return "BOOL_F"; break;
+		case ArgType::CHAR: return "CHAR"; break;
+		case ArgType::NULL_T: return "NULL_T"; break;
+		case ArgType::INFINITUM: return "INFINITUM"; break;
+		case ArgType::NONE: return "NONE"; break;
+		default: return "Unknown ArgType"; break;
+	}
 }
+
+namespace time {
+	
+static int64_t sTimeOffsetSecs = 0;
+static int64_t sTimeOffsetUsecs = 0;
+
+uint64_t get_current_ntp_time()
+{
+	auto now = std::chrono::system_clock::now();
+	auto sec = std::chrono::duration_cast<std::chrono::seconds>( now.time_since_epoch() ).count() + 0x83AA7E80;
+	auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
+	
+	return ( sec << 32 ) + ( usec % 1000000L );
+}
+
+uint64_t getClock()
+{
+	uint64_t ntp_time = get_current_ntp_time();
+	
+	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
+	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
+	
+	if( usecs < 0 ) {
+		secs += usecs / 1000000;
+		usecs += ( usecs / 1000000 ) * 1000000;
+	}
+	else {
+		secs += usecs / 1000000;
+		usecs -= ( usecs / 1000000 ) * 1000000;
+	}
+	
+	return ( secs << 32 ) + usecs;
+}
+
+uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
+{
+	uint64_t ntp_time = getClock();
+	
+	// Convert to unix timestamp.
+	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
+	
+	auto tm = std::localtime( &sec_since_epoch );
+	if( year ) *year = tm->tm_year + 1900;
+	if( month ) *month = tm->tm_mon + 1;
+	if( day ) *day = tm->tm_mday;
+	if( hours ) *hours = tm->tm_hour;
+	if( minutes ) *minutes = tm->tm_min;
+	if( seconds )*seconds = tm->tm_sec;
+	
+	return ntp_time;
+}
+
+std::string getClockString( bool includeDate )
+{
+	uint32_t year, month, day, hours, minutes, seconds;
+	getClock( &year, &month, &day, &hours, &minutes, &seconds );
+	
+	char buffer[128];
+	
+	if( includeDate )
+		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
+	else
+		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
+	
+	return std::string( buffer );
+}
+
+void setClock( uint64_t ntp_time )
+{
+	uint64_t current_ntp_time = get_current_ntp_time();
+	
+	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
+	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
+}
+
+} // namespace time
+
+} // namespace osc

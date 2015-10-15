@@ -35,9 +35,50 @@
 
 #pragma once
 
-#include "utils.h"
+#include "asio/asio.hpp"
 
 namespace osc {
+	
+//! Argument types suported by the Message class
+enum class ArgType { INTEGER_32, FLOAT, DOUBLE, STRING, BLOB, MIDI, TIME_TAG, INTEGER_64, BOOL_T, BOOL_F, CHAR, NULL_T, INFINITUM, NONE
+};
+//! Converts ArgType \a type to c-string.
+const char* argTypeToString( ArgType type );
+
+namespace time {
+	uint64_t get_current_ntp_time();
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock();
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds );
+	//! Returns the system clock as NTP time.
+	uint64_t getSystemClock() { return get_current_ntp_time(); }
+	//! Returns the current presentation time as a string.
+	std::string getClockString( bool includeDate = true );
+	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
+	void setClock( uint64_t ntp_time );
+	
+};
+	
+// Forward declarations
+class Message;
+using UdpSocketRef = std::shared_ptr<asio::ip::udp::socket>;
+using TcpSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
+
+/// A byte array type internally used in the tnyosc library.
+template<size_t size>
+using ByteArray = std::array<uint8_t, size>;
+using ByteBuffer = std::vector<uint8_t>;
+using ByteBufferRef = std::shared_ptr<ByteBuffer>;
+
+namespace decode {
+	//! Free function that decodes a complete OSC Packet into it's individual parts.
+	bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
+	//! Free function that decodes an individual message.
+	bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
+	//! Free function used to match the addresses of messages based on the OSC spec.
+	bool patternMatch( const std::string &lhs, const std::string &rhs );
+}
 	
 /// This class represents an Open Sound Control message. It supports Open Sound
 /// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
@@ -204,7 +245,7 @@ private:
 	friend class SenderBase;
 	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
-	friend bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag );
+	friend bool (decode::decodeMessage)( uint8_t *, uint32_t, std::vector<Message> &, uint64_t );
 };
 
 //! Convenient stream operator for Message
@@ -357,15 +398,6 @@ public:
 	SenderTcp( SenderTcp &&other ) = default;
 	SenderTcp& operator=( SenderTcp &&other ) = default;
 };
-	
-namespace decode {
-	//! Free function that decodes a complete OSC Packet into it's individual parts.
-	bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
-	//! Free function that decodes an individual message.
-	bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 );
-	//! Free function used to match the addresses of messages based on the OSC spec.
-	bool patternMatch( const std::string &lhs, const std::string &rhs );
-}
 
 //! ReceiverBase represents an OSC Receiver(server in OSC terms) and implements a unified
 //! interface without implementing any of the networking layer.
@@ -393,8 +425,7 @@ protected:
 	ReceiverBase( ReceiverBase &&other ) = default;
 	ReceiverBase& operator=( ReceiverBase &&other ) = default;
 	
-	//! Handles the async receive completion operations. Errors are handled by the specific network layer. Therefore, when this is called we know that we have a complete message.
-	void receiveHandler( std::size_t bytesTransferred, asio::streambuf &stream );
+	//! decodes and routes messages from the networking layers stream.
 	void dispatchMethods( uint8_t *data, uint32_t size );
 	
 	//! Implemented
@@ -425,6 +456,7 @@ public:
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
 protected:
+	//! Listens on the udp network socket for incoming datagrams. Handles the async receive completion operations. Any errors from asio are handled internally.
 	void listenImpl() override;
 	void closeImpl() override { mSocket->close(); }
 	
@@ -461,7 +493,7 @@ protected:
 		asio::ip::tcp::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
 		asio::ip::tcp::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
 		
-		//! Implements the read on the underlying socket.
+		//! Implements the read on the underlying socket. Handles the async receive completion operations. Any errors from asio are handled internally.
 		void read();
 		//! Simple alias for asio buffer iterator type.
 		using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
@@ -482,7 +514,9 @@ protected:
 		Connection& operator=( Connection &&other ) noexcept;
 	};
 	
+	//! Listens on the underlying tcp network socket for incoming connections.
 	void listenImpl() override;
+	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
 	
 	asio::io_service			&mIoService;
@@ -497,6 +531,20 @@ public:
 	ReceiverTcp& operator=( const ReceiverTcp &other ) = delete;
 	ReceiverTcp( ReceiverTcp &&other ) = default;
 	ReceiverTcp& operator=( ReceiverTcp &&other ) = default;
+};
+	
+class ExcIndexOutOfBounds : public ci::Exception {
+public:
+	ExcIndexOutOfBounds( const std::string &address, uint32_t index )
+	: Exception( std::string( std::to_string( index ) + " out of bounds from address, " + address ) )
+	{}
+};
+
+class ExcNonConvertible : public ci::Exception {
+public:
+	ExcNonConvertible( const std::string &address, uint32_t index, ArgType actualType, ArgType convertToType )
+	: Exception( std::string( std::to_string( index ) + ": " + address + ", expected type: " + argTypeToString( convertToType ) + ", actual type: " + argTypeToString( actualType ) ) )
+	{}
 };
 	
 }
