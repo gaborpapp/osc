@@ -74,8 +74,8 @@ public:
 	explicit Message( const std::string& address );
 	Message( const Message & ) = delete;
 	Message& operator=( const Message & ) = delete;
-	Message( Message && ) = default;
-	Message& operator=( Message && ) = default;
+	Message( Message && ) noexcept;
+	Message& operator=( Message && ) noexcept;
 	~Message() = default;
 	
 	// Functions for appending OSC 1.0 types
@@ -95,6 +95,7 @@ public:
 	void appendBlob( const ci::Buffer &buffer );
 	
 	// Functions for appending OSC 1.1 types
+	
 	//! Appends an OSC-timetag (NTP format) to the back of the message.
 	void appendTimeTag( uint64_t v );
 	//! Appends the current UTP timestamp to the back of the message.
@@ -102,11 +103,12 @@ public:
 	//! Appends a 'T'(True) or 'F'(False) to the back of the message.
 	void append( bool v );
 	//! Appends a Null (or nil) to the back of the message.
-	void appendNull() { mIsCached = false; mDataViews.emplace_back( ArgType::NULL_T, -1, 0 ); }
+	void appendNull() { mIsCached = false; mDataViews.emplace_back( this, ArgType::NULL_T, -1, 0 ); }
 	//! Appends an Impulse (or Infinitum) to the back of the message
-	void appendImpulse() { mIsCached = false; mDataViews.emplace_back( ArgType::INFINITUM, -1, 0 ); }
+	void appendImpulse() { mIsCached = false; mDataViews.emplace_back( this, ArgType::INFINITUM, -1, 0 ); }
 	
 	// Functions for appending nonstandard types
+	
 	//! Appends an int64_t to the back of the message.
 	void append( int64_t v );
 	//! Appends a float64 (or double) to the back of the message.
@@ -137,7 +139,7 @@ public:
 	
 	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
 	//! Returns the blob, as a ci::Buffer, located at \a index.
-	ci::Buffer	getBlob( uint32_t index ) const;
+	ci::Buffer	getBlob( uint32_t index, bool deepCopy = false ) const;
 	
 	//! Returns the argument type located at \a index.
 	ArgType		getArgType( uint32_t index ) const;
@@ -151,59 +153,61 @@ public:
 	/// Returns the OSC address of this message.
 	const std::string& getAddress() const { return mAddress; }
 	
-	/// Returns a complete byte array of this OSC message as a ByteArray type.
-	/// The byte array is constructed lazily and is cached until the cache is
-	/// obsolete. Call to |data| and |size| perform the same caching.
-	///
-	/// @return The OSC message as a ByteArray.
-	/// @see data
-	/// @see size
-	const ByteBuffer& byteArray() const;
-	
-	/// Returns the size of this OSC message.
-	///
-	/// @return Size of the OSC message in bytes.
-	/// @see byte_array
-	/// @see data
+	//! Returns the size of this OSC message as a complete packet.
+	//! Performs a lazy cache
 	size_t size() const;
 	
-	/// Clears the message.
+	/// Clears the message, specifically any cache, dataViews, and address.
 	void clear();
 	
 	class Argument {
 	public:
 		Argument();
-		Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
-		Argument( const Argument &arg ) = default;
-		Argument( Argument &&arg ) = default;
-		Argument& operator=( const Argument &arg ) = default;
-		Argument& operator=( Argument &&arg ) = default;
+		Argument( Message *owner, ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
+		Argument( const Argument &arg ) = delete;
+		Argument& operator=( const Argument &arg ) = delete;
+		Argument( Argument &&arg ) noexcept;
+		Argument& operator=( Argument &&arg ) noexcept;
 		
 		~Argument() = default;
 		
 		ArgType		getArgType() const { return mType; }
 		uint32_t	getArgSize() const { return mSize; }
 		int32_t		getOffset() const { return mOffset; }
-		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
-		void		outputValueToStream( uint8_t *buffer, std::ostream &ostream ) const;
-		
-		template<typename T>
-		bool convertible() const;
 		
 		static char translateArgTypeToChar( ArgType type );
 		static ArgType translateCharToArgType( char type );
 		
-		void swapEndianForTransmit( uint8_t* buffer ) const;
-		
+		int32_t		int32() const;
+		int64_t		int64() const;
+		float		flt() const;
+		double		dbl() const;
+		bool		boolean() const;
+		void		midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
+		ci::Buffer	blob( bool deepCopy = false ) const;
+		char		character() const;
+		std::string string() const;
+
 	private:
 		
+		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
+		void		outputValueToStream( std::ostream &ostream ) const;
+		void		swapEndianForTransmit( uint8_t* buffer ) const;
+		
+		template<typename T>
+		bool convertible() const;
+		
+		Message*		mOwner;
 		ArgType			mType;
 		int32_t			mOffset;
 		uint32_t		mSize;
 		bool			mNeedsEndianSwapForTransmit;
 		
 		friend class Message;
+		friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	};
+	
+	const Argument& operator[]( uint32_t index ) const;
 	
 private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
@@ -212,6 +216,9 @@ private:
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
 	
+	//! Returns a complete byte array of this OSC message as a ByteBufferRef type.
+	//! The byte buffer is constructed lazily and is cached until the cache is
+	//! obsolete. Call to |data| and |size| perform the same caching.
 	ByteBufferRef getSharedBuffer() const;
 	
 	std::string				mAddress;
@@ -248,14 +255,11 @@ public:
 	//! into this bundle and any changes to the message after the call to this
 	//! function does not affect this bundle.
 	// TODO: reimplement this so that it takes the shared buffer and get rid of bytebuffer.
-	void append( const Message &message ) { append_data( message.byteArray() ); }
-	void append( const Bundle &bundle ) { append_data( bundle.byteBuffer() ); }
+	void append( const Message &message ) { appendData( message.getSharedBuffer() ); }
+	void append( const Bundle &bundle ) { appendData( bundle.getSharedBuffer() ); }
 	
 	/// Sets timestamp of the bundle.
 	void setTimetag( uint64_t ntp_time );
-	
-	//! Returns a complete byte array of this OSC bundle type.
-	const ByteBuffer& byteBuffer() const { return *getSharedBuffer(); }
 	
 	//! Returns the size of this OSC bundle.
 	size_t size() const { return mDataBuffer->size(); }
@@ -270,7 +274,7 @@ private:
 	/// convenient for actually sending this OSC bundle.
 	ByteBufferRef getSharedBuffer() const;
 	
-	void append_data( const ByteBuffer& data );
+	void appendData( const ByteBufferRef& data );
 	
 	friend class SenderBase;
 };
@@ -400,6 +404,15 @@ public:
 	//! Removes the listener associated with \a address.
 	void		removeListener( const std::string &address );
 	
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds );
+	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
+	uint64_t getClock();
+	//! Returns the current presentation time as a string.
+	std::string getClockString( bool includeDate = true );
+	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
+	void setClock( uint64_t ntp_time );
+	
 protected:
 	ReceiverBase() = default;
 	virtual ~ReceiverBase() = default;
@@ -521,17 +534,6 @@ const char* argTypeToString( ArgType type );
 
 namespace time {
 	uint64_t get_current_ntp_time();
-	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
-	uint64_t getClock();
-	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
-	uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds );
-	//! Returns the system clock as NTP time.
-	uint64_t getSystemClock() { return get_current_ntp_time(); }
-	//! Returns the current presentation time as a string.
-	std::string getClockString( bool includeDate = true );
-	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
-	void setClock( uint64_t ntp_time );
-	
 };
 	
 class ExcIndexOutOfBounds : public ci::Exception {
@@ -543,8 +545,8 @@ public:
 
 class ExcNonConvertible : public ci::Exception {
 public:
-	ExcNonConvertible( const std::string &address, uint32_t index, ArgType actualType, ArgType convertToType )
-	: Exception( std::string( std::to_string( index ) + ": " + address + ", expected type: " + argTypeToString( convertToType ) + ", actual type: " + argTypeToString( actualType ) ) )
+	ExcNonConvertible( const std::string &address, ArgType actualType, ArgType convertToType )
+	: Exception( address + ": expected type: " + argTypeToString( convertToType ) + ", actual type: " + argTypeToString( actualType ) )
 	{}
 };
 	

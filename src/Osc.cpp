@@ -33,7 +33,7 @@
 /// 1.1 types and other nonstandard types, and bundles. Note that tnyosc does not
 /// include code to actually send or receive OSC messages.
 
-#include "Osc2.h"
+#include "Osc.h"
 #include "cinder/Log.h"
 
 using namespace std;
@@ -71,6 +71,9 @@ using namespace std::placeholders;
 
 namespace osc {
 	
+static int64_t sTimeOffsetSecs = 0;
+static int64_t sTimeOffsetUsecs = 0;
+	
 /// Convert 32-bit float to a big-endian network format
 inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
 /// Convert 64-bit float (double) to a big-endian network format
@@ -87,18 +90,64 @@ Message::Message( const std::string& address )
 : mAddress( address ), mIsCached( false )
 {
 }
+	
+Message::Message( Message &&message ) noexcept
+: mAddress( move( message.mAddress ) ), mDataBuffer( move( message.mDataBuffer ) ),
+	mDataViews( move( message.mDataViews ) ), mIsCached( message.mIsCached ),
+	mCache( move( message.mCache ) )
+{
+	for( auto & dataView : mDataViews ) {
+		dataView.mOwner = this;
+	}
+}
 
-Message::Argument::Argument()
-: mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
+Message& Message::operator=( Message &&message ) noexcept
+{
+	if( this != &message ) {
+		mAddress = move( message.mAddress );
+		mDataBuffer = move( message.mDataBuffer );
+		mDataViews = move( message.mDataViews );
+		mIsCached = message.mIsCached;
+		mCache = move( message.mCache );
+		for( auto & dataView : mDataViews ) {
+			dataView.mOwner = this;
+		}
+	}
+	return *this;
+}
+	
+using Argument = Message::Argument;
+
+Argument::Argument()
+: mOwner( nullptr ), mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
 {
 }
 
-Message::Argument::Argument( ArgType type, int32_t offset, uint32_t size, bool needsSwap )
-: mType( type ), mOffset( offset ), mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
+Argument::Argument( Message *owner, ArgType type, int32_t offset, uint32_t size, bool needsSwap )
+: mOwner( owner ), mType( type ), mOffset( offset ),
+	mSize( size ), mNeedsEndianSwapForTransmit( needsSwap )
 {
 }
+	
+Argument::Argument( Argument &&arg ) noexcept
+: mOwner( arg.mOwner ), mType( arg.mType ), mOffset( arg.mOffset ),
+	mSize( arg.mSize ), mNeedsEndianSwapForTransmit( arg.mNeedsEndianSwapForTransmit )
+{
+}
+	
+Argument& Argument::operator=( Argument &&arg ) noexcept
+{
+	if( this != &arg ) {
+		mOwner = arg.mOwner;
+		mType = arg.mType;
+		mOffset = arg.mOffset;
+		mSize = arg.mSize;
+		mNeedsEndianSwapForTransmit = arg.mNeedsEndianSwapForTransmit;
+	}
+	return *this;
+}
 
-ArgType Message::Argument::translateCharToArgType( char type )
+ArgType Argument::translateCharToArgType( char type )
 {
 	switch ( type ) {
 		case 'i': return ArgType::INTEGER_32; break;
@@ -118,7 +167,7 @@ ArgType Message::Argument::translateCharToArgType( char type )
 	}
 }
 
-char Message::Argument::translateArgTypeToChar( ArgType type )
+char Argument::translateArgTypeToChar( ArgType type )
 {
 	switch ( type ) {
 		case ArgType::INTEGER_32: return 'i'; break;
@@ -138,7 +187,7 @@ char Message::Argument::translateArgTypeToChar( ArgType type )
 	}
 }
 
-void Message::Argument::swapEndianForTransmit( uint8_t *buffer ) const
+void Argument::swapEndianForTransmit( uint8_t *buffer ) const
 {
 	auto ptr = &buffer[mOffset];
 	switch ( mType ) {
@@ -169,10 +218,9 @@ void Message::Argument::swapEndianForTransmit( uint8_t *buffer ) const
 	}
 }
 
-void Message::Argument::outputValueToStream( uint8_t *buffer, std::ostream &ostream ) const
+void Argument::outputValueToStream( std::ostream &ostream ) const
 {
-	
-	auto ptr = &buffer[mOffset];
+	auto ptr = &mOwner->mDataBuffer[mOffset];
 	switch ( mType ) {
 		case ArgType::INTEGER_32: ostream << *reinterpret_cast<int32_t*>( ptr ); break;
 		case ArgType::FLOAT: ostream << *reinterpret_cast<float*>( ptr ); break;
@@ -204,7 +252,7 @@ void Message::Argument::outputValueToStream( uint8_t *buffer, std::ostream &ostr
 void Message::append( int32_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_32, getCurrentOffset(), 4, true );
+	mDataViews.emplace_back( this, ArgType::INTEGER_32, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
 	memcpy( b.data(), &v, 4 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -213,7 +261,7 @@ void Message::append( int32_t v )
 void Message::append( float v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::FLOAT, getCurrentOffset(), 4, true );
+	mDataViews.emplace_back( this, ArgType::FLOAT, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
 	memcpy( b.data(), &v, 4 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -223,7 +271,7 @@ void Message::append( const std::string& v )
 {
 	mIsCached = false;
 	auto size = v.size() + getTrailingZeros( v.size() );
-	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
+	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
 	mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
 	mDataBuffer.resize( mDataBuffer.size() + getTrailingZeros( v.size() ), 0 );
 }
@@ -233,7 +281,7 @@ void Message::append( const char* v, size_t len )
 	if( ! v || len == 0 ) return;
 	mIsCached = false;
 	auto size = len + getTrailingZeros( len );
-	mDataViews.emplace_back( ArgType::STRING, getCurrentOffset(), size );
+	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
 	ByteBuffer b( v, v + len );
 	b.resize( size, 0 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -243,7 +291,7 @@ void Message::appendBlob( void* blob, uint32_t size )
 {
 	mIsCached = false;
 	auto totalBufferSize = 4 + size + getTrailingZeros( size );
-	mDataViews.emplace_back( ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
+	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
 	ByteBuffer b( totalBufferSize, 0 );
 	memcpy( b.data(), &size, 4 );
 	memcpy( b.data() + 4, blob, size );
@@ -258,7 +306,7 @@ void Message::appendBlob( const ci::Buffer &buffer )
 void Message::appendTimeTag( uint64_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::TIME_TAG, getCurrentOffset(), 8, true );
+	mDataViews.emplace_back( this, ArgType::TIME_TAG, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -273,15 +321,15 @@ void Message::append( bool v )
 {
 	mIsCached = false;
 	if( v )
-		mDataViews.emplace_back( ArgType::BOOL_T, -1, 0 );
+		mDataViews.emplace_back( this, ArgType::BOOL_T, -1, 0 );
 	else
-		mDataViews.emplace_back( ArgType::BOOL_F, -1, 0 );
+		mDataViews.emplace_back( this, ArgType::BOOL_F, -1, 0 );
 }
 
 void Message::append( int64_t v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::INTEGER_64, getCurrentOffset(), 8, true );
+	mDataViews.emplace_back( this, ArgType::INTEGER_64, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -290,7 +338,7 @@ void Message::append( int64_t v )
 void Message::append( double v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::DOUBLE, getCurrentOffset(), 8, true );
+	mDataViews.emplace_back( this, ArgType::DOUBLE, getCurrentOffset(), 8, true );
 	ByteArray<8> b;
 	memcpy( b.data(), &v, 8 );
 	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
@@ -299,7 +347,7 @@ void Message::append( double v )
 void Message::append( char v )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::CHAR, getCurrentOffset(), 4, true );
+	mDataViews.emplace_back( this, ArgType::CHAR, getCurrentOffset(), 4, true );
 	ByteArray<4> b;
 	b.fill( 0 );
 	b[0] = v;
@@ -309,7 +357,7 @@ void Message::append( char v )
 void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 )
 {
 	mIsCached = false;
-	mDataViews.emplace_back( ArgType::MIDI, getCurrentOffset(), 4 );
+	mDataViews.emplace_back( this, ArgType::MIDI, getCurrentOffset(), 4 );
 	ByteArray<4> b;
 	b[0] = port;
 	b[1] = status;
@@ -368,20 +416,110 @@ ByteBufferRef Message::getSharedBuffer() const
 }
 
 template<typename T>
-const Message::Argument& Message::getDataView( uint32_t index ) const
+const Argument& Message::getDataView( uint32_t index ) const
 {
 	if( index >= mDataViews.size() )
 		throw ExcIndexOutOfBounds( mAddress, index );
 	
-	auto &dataView = mDataViews[index];
-	if( ! dataView.convertible<T>() ) // TODO: change the type to typeid print out.
-		throw ExcNonConvertible( mAddress, index, ArgType::INTEGER_32, dataView.getArgType() );
+	return mDataViews[index];
+}
 	
-	return dataView;
+const Argument& Message::operator[]( uint32_t index ) const
+{
+	if( index >= mDataViews.size() )
+		throw ExcIndexOutOfBounds( mAddress, index );
+	
+	return mDataViews[index];
+}
+
+int32_t	Argument::int32() const
+{
+	if( ! convertible<int32_t>() ) // TODO: change the type to typeid print out.
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_32, getArgType() );
+	
+	return *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);;
+}
+	
+int64_t	Argument::int64() const
+{
+	if( ! convertible<int64_t>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_64, getArgType() );
+	
+	return *reinterpret_cast<const int64_t*>(&mOwner->mDataBuffer[getOffset()]);;
+}
+	
+float Argument::flt() const
+{
+	if( ! convertible<float>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::FLOAT, getArgType() );
+	
+	return *reinterpret_cast<const float*>(&mOwner->mDataBuffer[getOffset()]);;
+}
+	
+double Argument::dbl() const
+{
+	if( ! convertible<double>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::DOUBLE, getArgType() );
+	
+	return *reinterpret_cast<const double*>(&mOwner->mDataBuffer[getOffset()]);;
+}
+	
+bool Argument::boolean() const
+{
+	if( ! convertible<bool>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BOOL_T, getArgType() );
+	
+	return getArgType() == ArgType::BOOL_T;
+}
+	
+void Argument::midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
+{
+	if( ! convertible<int32_t>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::MIDI, getArgType() );
+	
+	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);
+	*port = midiVal;
+	*status = midiVal >> 8;
+	*data1 = midiVal >> 16;
+	*data2 = midiVal >> 24;
+}
+	
+ci::Buffer Argument::blob( bool deepCopy ) const
+{
+	if( ! convertible<ci::Buffer>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getArgType() );
+	
+	// skip the first 4 bytes, as they are the size
+	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mOwner->mDataBuffer[getOffset()+4] );
+	if( deepCopy ) {
+		ci::Buffer ret( getArgSize() );
+		memcpy( ret.getData(), data, getArgSize() );
+		return ret;
+	}
+	else {
+		return ci::Buffer( reinterpret_cast<void*>(  const_cast<uint8_t*>( data ) ), getArgSize() );
+	}
+}
+	
+char Argument::character() const
+{
+	if( ! convertible<int32_t>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::CHAR, getArgType() );
+	
+	return mOwner->mDataBuffer[getOffset()];
+}
+	
+std::string Argument::string() const
+{
+	if( ! convertible<std::string>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::STRING, getArgType() );
+	
+	const char* head = reinterpret_cast<const char*>(&mOwner->mDataBuffer[getOffset()]);
+	return std::string( head );
 }
 
 template<typename T>
-bool Message::Argument::convertible() const
+bool Argument::convertible() const
 {
 	switch ( mType ) {
 		case ArgType::INTEGER_32: return std::is_same<T, int32_t>::value;
@@ -404,6 +542,9 @@ bool Message::Argument::convertible() const
 
 ArgType Message::getArgType( uint32_t index ) const
 {
+	if( index >= mDataViews.size() )
+		throw ExcIndexOutOfBounds( mAddress, index );
+	
 	auto &dataView = mDataViews[index];
 	return dataView.getArgType();
 }
@@ -411,69 +552,61 @@ ArgType Message::getArgType( uint32_t index ) const
 int32_t Message::getInt( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	return *reinterpret_cast<const int32_t*>(&mDataBuffer[dataView.getOffset()]);
+	return dataView.int32();
 }
 
 float Message::getFloat( uint32_t index ) const
 {
 	auto &dataView = getDataView<float>( index );
-	return *reinterpret_cast<const float*>(&mDataBuffer[dataView.getOffset()]);
+	return dataView.flt();
 }
 
 std::string Message::getString( uint32_t index ) const
 {
 	auto &dataView = getDataView<std::string>( index );
-	const char* head = reinterpret_cast<const char*>(&mDataBuffer[dataView.getOffset()]);
-	return std::string( head );
+	return dataView.string();
 }
 
 int64_t Message::getTime( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataBuffer[dataView.getOffset()]);
+	return dataView.int64();
 }
 
 int64_t Message::getInt64( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
-	return *reinterpret_cast<int64_t*>(mDataBuffer[dataView.getOffset()]);
+	return dataView.int64();
 }
 
 double Message::getDouble( uint32_t index ) const
 {
 	auto &dataView = getDataView<double>( index );
-	return *reinterpret_cast<double*>(mDataBuffer[dataView.getOffset()]);
+	return dataView.dbl();
 }
 
 bool Message::getBool( uint32_t index ) const
 {
 	auto &dataView = getDataView<bool>( index );
-	return dataView.getArgType() == ArgType::BOOL_T;
+	return dataView.boolean();
 }
 
 char Message::getChar( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	return mDataBuffer[dataView.getOffset()];
+	return dataView.character();
 }
 
 void Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
-	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mDataBuffer[dataView.getOffset()]);
-	*port = midiVal;
-	*status = midiVal >> 8;
-	*data1 = midiVal >> 16;
-	*data2 = midiVal >> 24;
+	dataView.midi( port, status, data1, data2 );
 }
 
-ci::Buffer Message::getBlob( uint32_t index ) const
+ci::Buffer Message::getBlob( uint32_t index, bool deepCopy ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
-	ci::Buffer ret( dataView.getArgSize() );
-	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mDataBuffer[dataView.getOffset()+4] );
-	memcpy( ret.getData(), data, dataView.getArgSize() );
-	return ret;
+	return dataView.blob( deepCopy );
 }
 
 bool Message::bufferCache( uint8_t *data, size_t size )
@@ -512,6 +645,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 	mDataViews.resize( types.size() );
 	int j = 0;
 	for( auto & dataView : mDataViews ) {
+		dataView.mOwner = this;
 		dataView.mType = Argument::translateCharToArgType( types[j] );
 		switch( types[j] ) {
 			case 'i':
@@ -614,13 +748,6 @@ void Message::setAddress( const std::string& address )
 	mAddress = address;
 }
 
-const ByteBuffer& Message::byteArray() const
-{
-	if( ! mIsCached )
-		createCache();
-	return *mCache;
-}
-
 size_t Message::size() const
 {
 	if( ! mIsCached )
@@ -634,6 +761,7 @@ void Message::clear()
 	mAddress.clear();
 	mDataViews.clear();
 	mDataBuffer.clear();
+	mCache.reset();
 }
 
 std::ostream& operator<<( std::ostream &os, const Message &rhs )
@@ -641,7 +769,7 @@ std::ostream& operator<<( std::ostream &os, const Message &rhs )
 	os << "Address: " << rhs.getAddress() << std::endl;
 	for( auto &dataView : rhs.mDataViews ) {
 		os << "\t<" << argTypeToString( dataView.getArgType() ) << ">: ";
-		dataView.outputValueToStream( const_cast<uint8_t*>(rhs.mDataBuffer.data()), os );
+		dataView.outputValueToStream( os );
 		os << std::endl;
 	}
 	return os;
@@ -662,23 +790,23 @@ void Bundle::setTimetag( uint64_t ntp_time )
 {
 	uint64_t a = htonll( ntp_time );
 	ByteArray<8> b;
-	memcpy( b.data(), reinterpret_cast<uint8_t*>( a ), 8 );
+	memcpy( b.data(), reinterpret_cast<uint8_t*>( &a ), 8 );
 	mDataBuffer->insert( mDataBuffer->begin() + 12, b.begin(), b.end() );
 }
 
-void Bundle::append_data( const ByteBuffer& data )
+void Bundle::appendData( const ByteBufferRef& data )
 {
-	int32_t a = htonl( data.size() );
-	ByteBuffer b( 4 + data.size() );
-	memcpy( b.data(), reinterpret_cast<uint8_t*>(a), 4 );
-	std::copy( data.begin(), data.end(), b.begin() + 4 );
+	int32_t a = htonl( data->size() );
+	ByteArray<4> b;
+	memcpy( b.data(), reinterpret_cast<uint8_t*>(&a), 4 );
 	mDataBuffer->insert( mDataBuffer->end(), b.begin(), b.end() );
+	mDataBuffer->insert( mDataBuffer->end(), data->begin(), data->end() );
 }
 
 ByteBufferRef Bundle::getSharedBuffer() const
 {
 	int32_t a = htonl( size() );
-	memcpy( mDataBuffer->data(), reinterpret_cast<uint8_t*>( a ), 4 );
+	memcpy( mDataBuffer->data(), reinterpret_cast<uint8_t*>( &a ), 4 );
 	return mDataBuffer;
 }
 
@@ -804,7 +932,8 @@ bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, u
 			memcpy( &seg_size, data, 4 ); data += 4; size -= 4;
 			seg_size = ntohl( seg_size );
 			if( seg_size > size ) return false;
-			if( !decodeData( data, seg_size, messages, ntohll( timestamp ) ) ) return false;
+			// Need to move the data pointer for bundles up 4 because when attaching data to a bundle, I don't know what protocol is being used.
+			if( !decodeData( data + 4, seg_size - 4, messages, ntohll( timestamp ) ) ) return false;
 			data += seg_size; size -= seg_size;
 		}
 	}
@@ -953,6 +1082,66 @@ void ReceiverBase::removeListener( const std::string &address )
 	if( foundListener != mListeners.end() ) {
 		mListeners.erase( foundListener );
 	}
+}
+	
+uint64_t ReceiverBase::getClock()
+{
+	uint64_t ntp_time = time::get_current_ntp_time();
+	
+	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
+	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
+	
+	if( usecs < 0 ) {
+		secs += usecs / 1000000;
+		usecs += ( usecs / 1000000 ) * 1000000;
+	}
+	else {
+		secs += usecs / 1000000;
+		usecs -= ( usecs / 1000000 ) * 1000000;
+	}
+	
+	return ( secs << 32 ) + usecs;
+}
+
+uint64_t ReceiverBase::getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
+{
+	uint64_t ntp_time = getClock();
+	
+	// Convert to unix timestamp.
+	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
+	
+	auto tm = std::localtime( &sec_since_epoch );
+	if( year ) *year = tm->tm_year + 1900;
+	if( month ) *month = tm->tm_mon + 1;
+	if( day ) *day = tm->tm_mday;
+	if( hours ) *hours = tm->tm_hour;
+	if( minutes ) *minutes = tm->tm_min;
+	if( seconds )*seconds = tm->tm_sec;
+	
+	return ntp_time;
+}
+
+std::string ReceiverBase::getClockString( bool includeDate )
+{
+	uint32_t year, month, day, hours, minutes, seconds;
+	getClock( &year, &month, &day, &hours, &minutes, &seconds );
+	
+	char buffer[128];
+	
+	if( includeDate )
+		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
+	else
+		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
+	
+	return std::string( buffer );
+}
+
+void ReceiverBase::setClock( uint64_t ntp_time )
+{
+	uint64_t current_ntp_time = time::get_current_ntp_time();
+	
+	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
+	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
 }
 
 void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
@@ -1160,9 +1349,6 @@ const char* argTypeToString( ArgType type )
 }
 
 namespace time {
-	
-static int64_t sTimeOffsetSecs = 0;
-static int64_t sTimeOffsetUsecs = 0;
 
 uint64_t get_current_ntp_time()
 {
@@ -1171,66 +1357,6 @@ uint64_t get_current_ntp_time()
 	auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
 	
 	return ( sec << 32 ) + ( usec % 1000000L );
-}
-
-uint64_t getClock()
-{
-	uint64_t ntp_time = get_current_ntp_time();
-	
-	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
-	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
-	
-	if( usecs < 0 ) {
-		secs += usecs / 1000000;
-		usecs += ( usecs / 1000000 ) * 1000000;
-	}
-	else {
-		secs += usecs / 1000000;
-		usecs -= ( usecs / 1000000 ) * 1000000;
-	}
-	
-	return ( secs << 32 ) + usecs;
-}
-
-uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
-{
-	uint64_t ntp_time = getClock();
-	
-	// Convert to unix timestamp.
-	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
-	
-	auto tm = std::localtime( &sec_since_epoch );
-	if( year ) *year = tm->tm_year + 1900;
-	if( month ) *month = tm->tm_mon + 1;
-	if( day ) *day = tm->tm_mday;
-	if( hours ) *hours = tm->tm_hour;
-	if( minutes ) *minutes = tm->tm_min;
-	if( seconds )*seconds = tm->tm_sec;
-	
-	return ntp_time;
-}
-
-std::string getClockString( bool includeDate )
-{
-	uint32_t year, month, day, hours, minutes, seconds;
-	getClock( &year, &month, &day, &hours, &minutes, &seconds );
-	
-	char buffer[128];
-	
-	if( includeDate )
-		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
-	else
-		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
-	
-	return std::string( buffer );
-}
-
-void setClock( uint64_t ntp_time )
-{
-	uint64_t current_ntp_time = get_current_ntp_time();
-	
-	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
-	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
 }
 
 } // namespace time

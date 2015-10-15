@@ -35,15 +35,15 @@ TestApp::TestApp()
 	mReceiver.listen();
 	mReceiver.setListener( "/app/1",
 						  []( const osc::Message &message ){
-							  cout << "Integer: " << message.getInt( 0 ) << endl;
+							  cout << "Integer: " << message[0].int32() << endl;
 						  } );
 	mReceiver.setListener( "/app/2",
 						  []( const osc::Message &message ) {
-							  cout << "String: " << message.getString( 0 ) << endl;
+							  cout << "String: " << message[0].string() << endl;
 						  });
 	mReceiver.setListener( "/app/3",
 						  []( const osc::Message &message ) {
-							  auto blob0 = message.getBlob( 0 );
+							  auto blob0 = message[0].blob();
 							  TestStruct myStruct0( *reinterpret_cast<TestStruct*>( blob0.getData() ) );
 							  cout << "Test Struct 0: " <<  endl <<
 								"\tint: " << myStruct0.myInt << endl <<
@@ -78,12 +78,12 @@ void TestApp::update()
 		i++;
 		osc::Message message( "/app/1" );
 		message.append( i );
-		mSender.send( message );
+//		mSender.send( message );
 		osc::Message message2( "/app/2" );
 		static std::string test("testing");
 		test += ".";
 		message2.append( test );
-		mSender.send( message2 );
+//		mSender.send( message2 );
 		osc::Message message3( "/app/3" );
 		static TestStruct mTransmitStruct{ 0, 0, 0 };
 		mTransmitStruct.myInt += 45;
@@ -97,7 +97,12 @@ void TestApp::update()
 		mTransmitStruct.myDouble += 1.01;
 		message3.appendBlob( &mTransmitStruct, sizeof(TestStruct) );
 		//		cout << message3 << endl;
-		mSender.send( message3 );
+//		mSender.send( message3 );
+		osc::Bundle bundle;
+		bundle.append( message );
+		bundle.append( message2 );
+		bundle.append( message3 );
+		mSender.send( bundle );
 	}
 }
 
