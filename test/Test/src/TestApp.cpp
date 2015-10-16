@@ -23,8 +23,8 @@ class TestApp : public App {
 	void update() override;
 	void draw() override;
 	
-	osc::ReceiverTcp	mReceiver;
-	osc::SenderTcp		mSender;
+	osc::ReceiverUdp	mReceiver;
+	osc::SenderUdp		mSender;
 	osc::Message		mMessage;
 	
 	bool mIsConnected = false;
@@ -126,7 +126,7 @@ void TestApp::update()
 {
 	if( ! mIsConnected ) {
 		mSender.bind();
-		mSender.connect();
+//		mSender.connect();
 		mIsConnected = true;
 	}
 	else {
@@ -161,7 +161,6 @@ void TestApp::update()
 		
 		mMessage = std::move( message );
 		cout << mMessage << endl;
-		cout << "Message size: " << mMessage.size() << endl;
 	}
 }
 

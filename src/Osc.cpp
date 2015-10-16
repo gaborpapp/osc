@@ -234,7 +234,7 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 		case ArgType::STRING: ostream << reinterpret_cast<const char*>( ptr ); break;
 		case ArgType::BLOB: ostream << "Size: " << *reinterpret_cast<int32_t*>( ptr ); break;
 		case ArgType::INTEGER_64: ostream << *reinterpret_cast<int64_t*>( ptr ); break;
-		case ArgType::TIME_TAG: /*ostream << *reinterpret_cast<int64_t*>( ptr )*/; break;
+		case ArgType::TIME_TAG: ostream << *reinterpret_cast<int64_t*>( ptr ); break;
 		case ArgType::DOUBLE: ostream << *reinterpret_cast<double*>( ptr ); break;
 		case ArgType::CHAR: {
 			char v = *reinterpret_cast<char*>( ptr );
@@ -242,7 +242,7 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 		}
 			break;
 		case ArgType::MIDI: {
-			ostream <<	"Port"		<< int( *( ptr + 0 ) ) <<
+			ostream <<	" Port: "	<< int( *( ptr + 0 ) ) <<
 						" Status: " << int( *( ptr + 1 ) ) <<
 						" Data1: "  << int( *( ptr + 2 ) ) <<
 						" Data2: "  << int( *( ptr + 3 ) ) ;
@@ -821,10 +821,10 @@ ByteBufferRef Bundle::getSharedBuffer() const
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderBase
 	
-void SenderBase::setSocketTransportErrorHandler( SocketTransportErrorHandler errorHandler )
+void SenderBase::setSocketTransportErrorFn( SocketTransportErrorFn errorFn )
 {
-	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-	mSocketTransportErrorHandler = errorHandler;
+	std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
+	mSocketTransportErrorFn = errorFn;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -866,9 +866,9 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 			if( ! data->empty() )
 				oscAddress = std::string( (const char*)(data.get() + 4) );
 			
-			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-			if( mSocketTransportErrorHandler ) {
-				mSocketTransportErrorHandler( error, oscAddress );
+			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
+			if( mSocketTransportErrorFn ) {
+				mSocketTransportErrorFn( error, oscAddress );
 			}
 			else
 				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
@@ -878,15 +878,7 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 	
 void SenderUdp::closeImpl()
 {
-	asio::error_code error;
-	mSocket->close( error );
-	if( error ) {
-		std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-		if( mSocketTransportErrorHandler )
-			mSocketTransportErrorHandler( error, "" );
-		else
-			CI_LOG_E("Closing SenderUdp with error: " << error);
-	}
+	mSocket->close();
 }
 	
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -936,9 +928,9 @@ void SenderTcp::sendImpl( const ByteBufferRef &data )
 			if( ! data->empty() )
 				oscAddress = std::string( (const char*)(data.get() + 4) );
 			
-			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-			if( mSocketTransportErrorHandler ) {
-				mSocketTransportErrorHandler( error, oscAddress );
+			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
+			if( mSocketTransportErrorFn ) {
+				mSocketTransportErrorFn( error, oscAddress );
 			}
 			else
 				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
@@ -949,11 +941,11 @@ void SenderTcp::sendImpl( const ByteBufferRef &data )
 /////////////////////////////////////////////////////////////////////////////////////////
 //// ReceiverBase
 	
-void ReceiverBase::setListener( const std::string &address, Listener listener )
+void ReceiverBase::setListener( const std::string &address, ListenerFn listener )
 {
 	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-	[address]( const std::pair<std::string, Listener> &listener ) {
+	[address]( const std::pair<std::string, ListenerFn> &listener ) {
 		  return address == listener.first;
 	});
 	if( foundListener != mListeners.end() ) {
@@ -968,7 +960,7 @@ void ReceiverBase::removeListener( const std::string &address )
 {
 	std::lock_guard<std::mutex> lock( mListenerMutex );
 	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-	[address]( const std::pair<std::string, Listener> &listener ) {
+	[address]( const std::pair<std::string, ListenerFn> &listener ) {
 		  return address == listener.first;
 	});
 	if( foundListener != mListeners.end() ) {
@@ -1161,9 +1153,9 @@ void ReceiverUdp::listenImpl()
 	mSocket->async_receive_from( tempBuffer, *uniqueEndpoint,
 	[&, uniqueEndpoint]( const error_code &error, size_t bytesTransferred ) {
 		if( error ) {
-			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-			if( mSocketErrorHandler ) {
-				mSocketErrorHandler( error, *uniqueEndpoint );
+			std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
+			if( mSocketTransportErrorFn ) {
+				mSocketTransportErrorFn( error, *uniqueEndpoint );
 			}
 			else {
 				CI_LOG_E( error.message() << ", didn't receive message from " << uniqueEndpoint->address().to_string() );
@@ -1181,10 +1173,10 @@ void ReceiverUdp::listenImpl()
 	});
 }
 	
-void ReceiverUdp::setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler )
+void ReceiverUdp::setSocketErrorFn( SocketTransportErrorFn<protocol> errorFn )
 {
-	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-	mSocketErrorHandler = errorHandler;
+	std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
+	mSocketTransportErrorFn = errorFn;
 }
 	
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1236,9 +1228,9 @@ void ReceiverTcp::Connection::read()
 	[&]( const asio::error_code &error, size_t bytesTransferred ) {
 		if( error ) {
 			auto remote = getRemoteEndpoint();
-			std::lock_guard<std::mutex> lock( mReceiver->mSocketErrorHandlerMutex );
-			if( mReceiver->mSocketErrorHandler ) {
-				mReceiver->mSocketErrorHandler( error, remote );
+			std::lock_guard<std::mutex> lock( mReceiver->mSocketTransportErrorFnMutex );
+			if( mReceiver->mSocketTransportErrorFn ) {
+				mReceiver->mSocketTransportErrorFn( error, remote );
 			}
 			else {
 				CI_LOG_E( error.message() << ", didn't receive message from " << remote.address().to_string() );
@@ -1250,7 +1242,7 @@ void ReceiverTcp::Connection::read()
 			istream stream( &mBuffer );
 			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
 			{
-				std::lock_guard<std::mutex> lock( mReceiver->mDataHandlerMutex );
+				std::lock_guard<std::mutex> lock( mReceiver->mDispatchMutex );
 				mReceiver->dispatchMethods( (data.get() + 4), bytesTransferred );
 			}
 		}
@@ -1274,10 +1266,10 @@ void ReceiverTcp::bindImpl()
 	mAcceptor.bind( mLocalEndpoint );
 }
 	
-void ReceiverTcp::setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler )
+void ReceiverTcp::setSocketTransportErrorFn( SocketTransportErrorFn<protocol> errorFn )
 {
-	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-	mSocketErrorHandler = errorHandler;
+	std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
+	mSocketTransportErrorFn = errorFn;
 }
 
 void ReceiverTcp::listenImpl()
@@ -1294,9 +1286,9 @@ void ReceiverTcp::listenImpl()
 			mConnections.back()->read();
 		}
 		else {
-			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
-			if( mSocketErrorHandler ) {
-				mSocketErrorHandler( error, protocol::endpoint() );
+			std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
+			if( mSocketTransportErrorFn ) {
+				mSocketTransportErrorFn( error, protocol::endpoint() );
 			}
 			else
 				CI_LOG_E("Accept: " << error.message());
@@ -1338,21 +1330,21 @@ const char* argTypeToString( ArgType type )
 
 namespace time {
 
-uint64_t get_current_ntp_time()
+uint64_t get_current_ntp_time( milliseconds offsetMillis )
 {
-	auto now = std::chrono::system_clock::now();
+	auto now = std::chrono::system_clock::now() + offsetMillis;
 	auto sec = std::chrono::duration_cast<std::chrono::seconds>( now.time_since_epoch() ).count() + 0x83AA7E80;
 	auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
 	
 	return ( sec << 32 ) + ( usec % 1000000L );
 }
 	
-uint64_t getClock()
+uint64_t getFutureClockWithOffset( milliseconds offsetFuture, uint64_t localOffsetSecs, uint64_t localOffsetUSecs )
 {
-	uint64_t ntp_time = time::get_current_ntp_time();
+	uint64_t ntp_time = get_current_ntp_time( offsetFuture );
 	
-	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
-	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
+	uint64_t secs = ( ntp_time >> 32 ) + localOffsetSecs;
+	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + localOffsetUSecs;
 	
 	if( usecs < 0 ) {
 		secs += usecs / 1000000;
@@ -1366,12 +1358,10 @@ uint64_t getClock()
 	return ( secs << 32 ) + usecs;
 }
 
-uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
+void getDate( uint64_t ntpTime, uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
 {
-	uint64_t ntp_time = getClock();
-	
 	// Convert to unix timestamp.
-	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
+	std::time_t sec_since_epoch = ( ntpTime - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
 	
 	auto tm = std::localtime( &sec_since_epoch );
 	if( year ) *year = tm->tm_year + 1900;
@@ -1380,14 +1370,12 @@ uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hou
 	if( hours ) *hours = tm->tm_hour;
 	if( minutes ) *minutes = tm->tm_min;
 	if( seconds )*seconds = tm->tm_sec;
-	
-	return ntp_time;
 }
 
-std::string getClockString( bool includeDate )
+std::string getClockString( uint64_t ntpTime, bool includeDate )
 {
 	uint32_t year, month, day, hours, minutes, seconds;
-	getClock( &year, &month, &day, &hours, &minutes, &seconds );
+	getDate( ntpTime, &year, &month, &day, &hours, &minutes, &seconds );
 	
 	char buffer[128];
 	
@@ -1399,12 +1387,12 @@ std::string getClockString( bool includeDate )
 	return std::string( buffer );
 }
 
-void setClock( uint64_t ntp_time )
+void calcOffsetFromSystem( uint64_t ntpTime, uint64_t *localOffsetSecs, uint64_t *localOffsetUSecs )
 {
 	uint64_t current_ntp_time = time::get_current_ntp_time();
 	
-	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
-	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
+	*localOffsetSecs = ( ntpTime >> 32 ) - ( current_ntp_time >> 32 );
+	*localOffsetUSecs = ( ntpTime & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
 }
 
 } // namespace time

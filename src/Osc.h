@@ -282,26 +282,24 @@ private:
 //! interface without implementing any of the networking layer.
 class SenderBase {
 public:
-	//! Alias function that represents a general error handler for the socket. Note: for some errors
+	//! Alias function that represents a general error callback for the socket. Note: for some errors
 	//! there'll not be an accompanying oscAddress, or it'll not have a value set. These errors have
 	//! nothing to do with transport but other socket operations like bind and open. To see more about
 	//! asio's error_codes, look at "asio/error.hpp".
-	using SocketTransportErrorHandler = std::function<void( const asio::error_code & /*error*/,
-														    const std::string & /*oscAddress*/)>;
+	using SocketTransportErrorFn = std::function<void( const asio::error_code & /*error*/,
+													   const std::string & /*oscAddress*/)>;
 	
 	//! Binds the underlying network socket. Should be called before trying any communication operations.
-	//! If there are errors, the SocketErrorHandler associated will be called with an empty endpoint.
 	void bind() { bindImpl(); }
 	//! Sends \a message to the destination endpoint.
 	void send( const Message &message ) { sendImpl( message.getSharedBuffer() ); }
 	//! Sends \a bundle to the destination endpoint.
 	void send( const Bundle &bundle ) { sendImpl( bundle.getSharedBuffer() ); }
-	//! Closes the underlying connection to the socket. If there are any errors the
-	//! SocketTransportErrorHandler will be called with an empty endpoint.
+	//! Closes the underlying connection to the socket.
 	void close() { closeImpl(); }
 	
-	//!
-	void setSocketTransportErrorHandler( SocketTransportErrorHandler errorHandler );
+	//! Sets the underlying socket transport error fn with \a errorFn.
+	void setSocketTransportErrorFn( SocketTransportErrorFn errorFn );
 	
 protected:
 	SenderBase() = default;
@@ -318,8 +316,8 @@ protected:
 	//! Abstract bind function implemented by the network layer
 	virtual void bindImpl() = 0;
 	
-	SocketTransportErrorHandler	mSocketTransportErrorHandler;
-	std::mutex					mSocketErrorHandlerMutex;
+	SocketTransportErrorFn	mSocketTransportErrorFn;
+	std::mutex				mSocketErrorFnMutex;
 };
 	
 class SenderUdp : public SenderBase {
@@ -425,27 +423,25 @@ public:
 //! interface without implementing any of the networking layer.
 class ReceiverBase {
 public:
-	//! Alias function that represents a general error handler for the socket. To see more about
+	//! Alias function that represents a transport error function. To see more about
 	//! asio's error_codes, look at "asio/error.hpp".
 	template<typename Protocol>
-	using SocketErrorHandler = std::function<void( const asio::error_code &/*error*/,
+	using SocketTransportErrorFn = std::function<void( const asio::error_code &/*error*/,
 												   const typename Protocol::endpoint &/*originator*/)>;
 	//! Alias function representing a message callback.
-	using Listener = std::function<void( const Message &message )>;
+	using ListenerFn = std::function<void( const Message &message )>;
 	//! Alias container for callbacks.
-	using Listeners = std::vector<std::pair<std::string, Listener>>;
+	using Listeners = std::vector<std::pair<std::string, ListenerFn>>;
 	
 	//! Binds the underlying network socket. Should be called before trying communication operations.
-	//! If there are errors, the SocketErrorHandler associated will be called with an empty endpoint.
 	void		bind() { bindImpl(); }
 	//! Commits the socket to asynchronously listen and begin to receive from outside connections.
 	void		listen() { listenImpl(); }
 	//! Closes the underlying network socket. Should be called on most errors to reset the socket.
-	//! If there are errors, the SocketErrorHandler associated will be called with an empty endpoint.
 	void		close() { closeImpl(); }
 	
 	//! Sets a callback, \a listener, to be called when receiving a message with \a address. If a listener exists for this address, \a listener will replace it.
-	void		setListener( const std::string &address, Listener listener );
+	void		setListener( const std::string &address, ListenerFn listener );
 	//! Removes the listener associated with \a address.
 	void		removeListener( const std::string &address );
 	
@@ -479,7 +475,7 @@ protected:
 	virtual void closeImpl() = 0;
 	
 	Listeners		mListeners;
-	std::mutex		mListenerMutex, mSocketErrorHandlerMutex;
+	std::mutex		mListenerMutex, mSocketTransportErrorFnMutex;
 };
 	
 //! ReceiverUdp represents an OSC Receiver(server in OSC terms) and implements the udp transport
@@ -501,8 +497,8 @@ public:
 	//! Returns the local udp::endpoint of the underlying socket.
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
-	//! Sets the underlying socketErrorHandler based on the asio::io::tcp protocol.
-	void setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler );
+	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
+	void setSocketErrorFn( SocketTransportErrorFn<protocol> errorFn );
 	
 protected:
 	//! Opens and Binds the underlying udp socket to the protocol and localEndpoint respectively.
@@ -511,13 +507,13 @@ protected:
 	void listenImpl() override;
 	void closeImpl() override { mSocket->close(); }
 	
-	UdpSocketRef					mSocket;
-	asio::ip::udp::endpoint			mLocalEndpoint;
-	asio::streambuf					mBuffer;
+	UdpSocketRef						mSocket;
+	asio::ip::udp::endpoint				mLocalEndpoint;
+	asio::streambuf						mBuffer;
 	
-	SocketErrorHandler<protocol>	mSocketErrorHandler;
+	SocketTransportErrorFn<protocol>	mSocketTransportErrorFn;
 	
-	uint32_t						mAmountToReceive;
+	uint32_t							mAmountToReceive;
 	
 public:
 	//! Non-copyable.
@@ -543,8 +539,8 @@ public:
 	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
 	virtual ~ReceiverTcp() = default;
 	
-	//! Sets the underlying socketErrorHandler based on the asio::io::tcp protocol.
-	void setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler );
+	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
+	void setSocketTransportErrorFn( SocketTransportErrorFn<protocol> errorFn );
 	
 protected:
 	struct Connection {
@@ -552,8 +548,8 @@ protected:
 		
 		~Connection();
 		
-		asio::ip::tcp::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
-		asio::ip::tcp::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
+		protocol::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
+		protocol::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
 		
 		//! Implements the read on the underlying socket. Handles the async receive completion operations. Any errors from asio are handled internally.
 		void read();
@@ -586,12 +582,12 @@ protected:
 	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
 	
-	asio::ip::tcp::acceptor			mAcceptor;
-	asio::ip::tcp::endpoint			mLocalEndpoint;
+	asio::ip::tcp::acceptor				mAcceptor;
+	asio::ip::tcp::endpoint				mLocalEndpoint;
 	
-	SocketErrorHandler<protocol>	mSocketErrorHandler;
+	SocketTransportErrorFn<protocol>	mSocketTransportErrorFn;
 	
-	std::mutex						mDataHandlerMutex, mConnectionMutex;
+	std::mutex							mDispatchMutex, mConnectionMutex;
 	
 	using UniqueConnection = std::unique_ptr<Connection>;
 	std::vector<UniqueConnection>			mConnections;
@@ -612,16 +608,15 @@ public:
 const char* argTypeToString( ArgType type );
 
 namespace time {
+	using milliseconds = std::chrono::milliseconds;
 	//! Returns system clock time.
-	uint64_t get_current_ntp_time();
+	uint64_t get_current_ntp_time( milliseconds offsetMillis = milliseconds( 0 ) );
 	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
-	uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds );
-	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
-	uint64_t getClock();
+	uint64_t getFutureClockWithOffset( milliseconds offsetFuture = milliseconds( 0 ), uint64_t localOffsetSecs = 0, uint64_t localOffsetUSecs = 0 );
 	//! Returns the current presentation time as a string.
-	std::string getClockString( bool includeDate = true );
+	std::string getClockString( uint64_t ntpTime, bool includeDate = false );
 	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
-	void setClock( uint64_t ntp_time );
+	void calcOffsetFromSystem( uint64_t ntpTime, uint64_t *localOffsetSecs, uint64_t *localOffsetUSecs );
 };
 	
 class ExcIndexOutOfBounds : public ci::Exception {
