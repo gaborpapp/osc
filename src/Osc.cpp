@@ -646,7 +646,10 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 	// extract address
 	head = tail = data;
 	while( tail[i] != '\0' && ++i < remain );
-	if( i == remain ) return false;
+	if( i == remain ) {
+		CI_LOG_E( "Problem Parsing Message: No address." );
+		return false;
+	}
 	
 	mAddress.insert( 0, (char*)head, i );
 	
@@ -655,11 +658,17 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 	
 	i = 0;
 	tail = head;
-	if( head[i++] != ',' ) return false;
+	if( head[i++] != ',' ) {
+		CI_LOG_E( "Problem Parsing Message: Mesage with address [" << mAddress << "] not properly formatted; no , seperator."  );
+		return false;
+	}
 	
 	// extract types
 	while( tail[i] != '\0' && ++i < remain );
-	if( i == remain ) return false;
+	if( i == remain ) {
+		CI_LOG_E( "Problem Parsing Message:  Mesage with address [" << mAddress << "] not properly formatted; Types not complete." );
+		return false;
+	}
 	
 	std::vector<char> types( i - 1 );
 	std::copy( head + 1, head + i, types.begin() );
@@ -687,13 +696,16 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				head += sizeof( uint32_t );
 				remain -= sizeof( uint32_t );
 			}
-				break;
+			break;
 			case 'b': {
 				memcpy( &int32, head, 4 );
 				head += 4;
 				remain -= 4;
 				int32 = htonl( int32 );
-				if( int32 > remain ) return false;
+				if( int32 > remain ) {
+					CI_LOG_E( "Problem Parsing Message:  Mesage with address [" << mAddress << "] not properly formatted; Blobs size is too long." );
+					return false;
+				}
 				auto trailingZeros = getTrailingZeros( int32 );
 				dataView.mSize = int32;
 				dataView.mOffset = getCurrentOffset();
@@ -702,7 +714,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				head += int32 + trailingZeros;
 				remain -= int32 + trailingZeros;
 			}
-				break;
+			break;
 			case 's':
 			case 'S': {
 				tail = head;
@@ -990,7 +1002,6 @@ void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
 	}
 }
 	
-// TODO: Better error handling here.
 bool ReceiverBase::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag ) const
 {
 	if( ! memcmp( data, "#bundle\0", 8 ) ) {
@@ -1001,16 +1012,23 @@ bool ReceiverBase::decodeData( uint8_t *data, uint32_t size, std::vector<Message
 		
 		while( size != 0 ) {
 			uint32_t seg_size;
-			memcpy( &seg_size, data, 4 ); data += 4; size -= 4;
+			memcpy( &seg_size, data, 4 );
+			data += 4; size -= 4;
+			
 			seg_size = ntohl( seg_size );
-			if( seg_size > size ) return false;
-			// Need to move the data pointer for bundles up 4 because when attaching data to a bundle, I don't know what protocol is being used.
-			if( !decodeData( data, seg_size, messages, ntohll( timestamp ) ) ) return false;
+			if( seg_size > size ) {
+				CI_LOG_E( "Problem Parsing Bundle: Segment Size is greater than bundle size." );
+				return false;
+			}
+			if( !decodeData( data, seg_size, messages, ntohll( timestamp ) ) )
+				return false;
+			
 			data += seg_size; size -= seg_size;
 		}
 	}
 	else {
-		if( ! decodeMessage( data, size, messages, timetag ) ) return false;
+		if( ! decodeMessage( data, size, messages, timetag ) )
+			return false;
 	}
 	
 	return true;

@@ -496,8 +496,8 @@ protected:
 	//! Abstract close implementation function.
 	virtual void closeImpl() = 0;
 	
-	Listeners		mListeners;
-	std::mutex		mListenerMutex, mSocketTransportErrorFnMutex;
+	Listeners				mListeners;
+	std::mutex				mListenerMutex, mSocketTransportErrorFnMutex;
 };
 	
 //! ReceiverUdp represents an OSC Receiver(server in OSC terms) and implements the udp transport
@@ -553,12 +553,12 @@ public:
 class ReceiverTcp : public ReceiverBase {
 public:
 	using protocol = asio::ip::tcp;
+	using AcceptorRef = std::shared_ptr<asio::ip::tcp::acceptor>;
 	ReceiverTcp( uint16_t port,
 			 const protocol &protocol = protocol::v4(),
 			 asio::io_service &service = ci::app::App::get()->io_service()  );
 	ReceiverTcp( const protocol::endpoint &localEndpoint,
 			 asio::io_service &service = ci::app::App::get()->io_service() );
-	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
 	virtual ~ReceiverTcp() = default;
 	
 	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
