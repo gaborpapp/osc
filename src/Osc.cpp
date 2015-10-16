@@ -195,23 +195,23 @@ void Argument::swapEndianForTransmit( uint8_t *buffer ) const
 		case ArgType::CHAR:
 		case ArgType::BLOB: {
 			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
-			memcpy( ptr, &a, 4 );
+			memcpy( ptr, &a, sizeof( int32_t ) );
 		}
 			break;
 		case ArgType::INTEGER_64:
 		case ArgType::TIME_TAG: {
 			uint64_t a = htonll( *reinterpret_cast<uint64_t*>(ptr) );
-			memcpy( ptr, &a, 8 );
+			memcpy( ptr, &a, sizeof( uint64_t ) );
 		}
 			break;
 		case ArgType::FLOAT: {
 			int32_t a = htonf( *reinterpret_cast<float*>(ptr) );
-			memcpy( ptr, &a, 4 );
+			memcpy( ptr, &a, sizeof( float ) );
 		}
 			break;
 		case ArgType::DOUBLE: {
 			int64_t a = htond( *reinterpret_cast<double*>(ptr) );
-			memcpy( ptr, &a, 8 );
+			memcpy( ptr, &a, sizeof( double ) );
 		}
 			break;
 		default: break;
@@ -224,7 +224,7 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 	switch ( mType ) {
 		case ArgType::INTEGER_32: ostream << *reinterpret_cast<int32_t*>( ptr ); break;
 		case ArgType::FLOAT: ostream << *reinterpret_cast<float*>( ptr ); break;
-		case ArgType::STRING: ostream << *reinterpret_cast<const char*>( ptr ); break;
+		case ArgType::STRING: ostream << reinterpret_cast<const char*>( ptr ); break;
 		case ArgType::BLOB: ostream << "Size: " << *reinterpret_cast<int32_t*>( ptr ); break;
 		case ArgType::INTEGER_64: ostream << *reinterpret_cast<int64_t*>( ptr ); break;
 		case ArgType::TIME_TAG: /*ostream << *reinterpret_cast<int64_t*>( ptr )*/; break;
@@ -236,9 +236,9 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 			break;
 		case ArgType::MIDI: {
 			ostream <<	"Port"		<< int( *( ptr + 0 ) ) <<
-			" Status: " << int( *( ptr + 1 ) ) <<
-			" Data1: "  << int( *( ptr + 2 ) ) <<
-			" Data2: "  << int( *( ptr + 3 ) ) ;
+						" Status: " << int( *( ptr + 1 ) ) <<
+						" Data1: "  << int( *( ptr + 2 ) ) <<
+						" Data2: "  << int( *( ptr + 3 ) ) ;
 		}
 			break;
 		case ArgType::BOOL_T: ostream << "True"; break;
@@ -253,49 +253,43 @@ void Message::append( int32_t v )
 {
 	mIsCached = false;
 	mDataViews.emplace_back( this, ArgType::INTEGER_32, getCurrentOffset(), 4, true );
-	ByteArray<4> b;
-	memcpy( b.data(), &v, 4 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &v, sizeof(int32_t) );
 }
 
 void Message::append( float v )
 {
 	mIsCached = false;
 	mDataViews.emplace_back( this, ArgType::FLOAT, getCurrentOffset(), 4, true );
-	ByteArray<4> b;
-	memcpy( b.data(), &v, 4 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &v, sizeof(float) );
 }
 
 void Message::append( const std::string& v )
 {
 	mIsCached = false;
-	auto size = v.size() + getTrailingZeros( v.size() );
+	auto trailingZeros = getTrailingZeros( v.size() );
+	auto size = v.size() + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
-	mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
-	mDataBuffer.resize( mDataBuffer.size() + getTrailingZeros( v.size() ), 0 );
+	appendDataBuffer( v.data(), v.size(), trailingZeros );
 }
 
 void Message::append( const char* v, size_t len )
 {
 	if( ! v || len == 0 ) return;
 	mIsCached = false;
-	auto size = len + getTrailingZeros( len );
+	auto trailingZeros = getTrailingZeros( len );
+	auto size = len + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
-	ByteBuffer b( v, v + len );
-	b.resize( size, 0 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( v, len, trailingZeros );
 }
 
 void Message::appendBlob( void* blob, uint32_t size )
 {
 	mIsCached = false;
-	auto totalBufferSize = 4 + size + getTrailingZeros( size );
+	auto trailingZeros = getTrailingZeros( size );
+	auto totalBufferSize = 4 + size + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
-	ByteBuffer b( totalBufferSize, 0 );
-	memcpy( b.data(), &size, 4 );
-	memcpy( b.data() + 4, blob, size );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &size, sizeof(uint32_t) );
+	appendDataBuffer( blob, size, trailingZeros );
 }
 
 void Message::appendBlob( const ci::Buffer &buffer )
@@ -307,9 +301,7 @@ void Message::appendTimeTag( uint64_t v )
 {
 	mIsCached = false;
 	mDataViews.emplace_back( this, ArgType::TIME_TAG, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &v, sizeof( uint64_t ) );
 }
 	
 void Message::appendCurrentTime()
@@ -330,18 +322,14 @@ void Message::append( int64_t v )
 {
 	mIsCached = false;
 	mDataViews.emplace_back( this, ArgType::INTEGER_64, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &v, sizeof( int64_t ) );
 }
 
 void Message::append( double v )
 {
 	mIsCached = false;
 	mDataViews.emplace_back( this, ArgType::DOUBLE, getCurrentOffset(), 8, true );
-	ByteArray<8> b;
-	memcpy( b.data(), &v, 8 );
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( &v, sizeof( double ) );
 }
 
 void Message::append( char v )
@@ -351,7 +339,7 @@ void Message::append( char v )
 	ByteArray<4> b;
 	b.fill( 0 );
 	b[0] = v;
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( b.data(), b.size() );
 }
 
 void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 )
@@ -363,7 +351,7 @@ void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t d
 	b[1] = status;
 	b[2] = data1;
 	b[3] = data2;
-	mDataBuffer.insert( mDataBuffer.end(), b.begin(), b.end() );
+	appendDataBuffer( b.data(), b.size() );
 }
 
 //void Message::appendArray( void* array, size_t size )
@@ -422,6 +410,14 @@ const Argument& Message::getDataView( uint32_t index ) const
 		throw ExcIndexOutOfBounds( mAddress, index );
 	
 	return mDataViews[index];
+}
+	
+void Message::appendDataBuffer( const void *begin, uint32_t size, uint32_t trailingZeros )
+{
+	auto ptr = reinterpret_cast<const uint8_t*>( begin );
+	mDataBuffer.insert( mDataBuffer.end(), ptr, ptr + size );
+	if( trailingZeros != 0 )
+		mDataBuffer.resize( mDataBuffer.size() + trailingZeros, 0 );
 }
 	
 const Argument& Message::operator[]( uint32_t index ) const
@@ -651,15 +647,13 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 			case 'i':
 			case 'f':
 			case 'r': {
-				dataView.mSize = 4;
+				dataView.mSize = sizeof( uint32_t );
 				dataView.mOffset = getCurrentOffset();
-				memcpy( &int32, head, 4 );
+				memcpy( &int32, head, sizeof( uint32_t ) );
 				int32 = htonl( int32 );
-				ByteArray<4> v;
-				memcpy( v.data(), &int32, 4 );
-				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
-				head += 4;
-				remain -= 4;
+				appendDataBuffer( &int32, sizeof( uint32_t ) );
+				head += sizeof( uint32_t );
+				remain -= sizeof( uint32_t );
 			}
 				break;
 			case 'b': {
@@ -670,11 +664,11 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				if( int32 > remain ) return false;
 				dataView.mSize = int32;
 				dataView.mOffset = getCurrentOffset();
-				mDataBuffer.resize( mDataBuffer.size() + 4 + int32 );
-				memcpy( &mDataBuffer[dataView.mOffset], &int32, 4 );
-				memcpy( &mDataBuffer[dataView.mOffset + 4], head, int32 );
-				head += int32 + 4;
-				remain -= int32;
+				auto trailingZeros = getTrailingZeros( dataView.mSize );
+				appendDataBuffer( &dataView.mSize, sizeof( uint32_t ) );
+				appendDataBuffer( head, dataView.mSize, trailingZeros );
+				head += int32 + trailingZeros;
+				remain -= int32 + trailingZeros;
 			}
 				break;
 			case 's':
@@ -684,9 +678,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				while( tail[i] != '\0' && ++i < remain );
 				dataView.mSize = i;
 				dataView.mOffset = getCurrentOffset();
-				mDataBuffer.resize( mDataBuffer.size() + i + 1 );
-				memcpy( &mDataBuffer[dataView.mOffset], head, i + 1 );
-				mDataBuffer[mDataBuffer.size() - 1] = '\0';
+				appendDataBuffer( head, i, getTrailingZeros( i ) );
 				i += getTrailingZeros( i );
 				head += i;
 				remain -= i;
@@ -695,34 +687,31 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 			case 'h':
 			case 'd':
 			case 't': {
-				memcpy( &int64, head, 8 );
+				memcpy( &int64, head, sizeof( uint64_t ) );
 				int64 = htonll( int64 );
 				dataView.mSize = i;
 				dataView.mOffset = getCurrentOffset();
-				ByteArray<8> v;
-				memcpy( v.data(), &int64, 8 );
-				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
-				head += 8;
-				remain -= 8;
+				appendDataBuffer( &int64, sizeof( uint64_t ) );
+				head += sizeof( uint64_t );
+				remain -= sizeof( uint64_t );
 			}
 				break;
 			case 'c': {
 				dataView.mSize = 4;
 				dataView.mOffset = getCurrentOffset();
 				memcpy( &int32, head, 4 );
-				mDataBuffer.push_back( (char) htonl( int32 ) );
-				head += 4;
-				remain -= 8;
+				auto character = (int) htonl( int32 );
+				appendDataBuffer( &character, 4 );
+				head += sizeof( int );
+				remain -= sizeof( int );
 			}
 				break;
 			case 'm': {
-				dataView.mSize = 4;
+				dataView.mSize = sizeof( int );
 				dataView.mOffset = getCurrentOffset();
-				std::array<uint8_t, 4> v;
-				memcpy( v.data(), head, 4 );
-				mDataBuffer.insert( mDataBuffer.end(), v.begin(), v.end() );
-				head += 4;
-				remain -= 4;
+				appendDataBuffer( head, sizeof( int ) );
+				head += sizeof( int );
+				remain -= sizeof( int );
 			}
 				break;
 		}
@@ -810,19 +799,6 @@ ByteBufferRef Bundle::getSharedBuffer() const
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderBase
 	
-SenderBase::SenderBase( SenderBase &&other ) noexcept
-: mSocketTransportErrorHandler( std::move( other.mSocketTransportErrorHandler ) )
-{
-}
-	
-SenderBase& SenderBase::operator=( SenderBase &&other ) noexcept
-{
-	if( this != &other ) {
-		mSocketTransportErrorHandler = std::move( other.mSocketTransportErrorHandler );
-	}
-	return *this;
-}
-	
 void SenderBase::setSocketTransportErrorHandler( SocketTransportErrorHandler errorHandler )
 {
 	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
@@ -847,24 +823,6 @@ SenderUdp::SenderUdp( uint16_t localPort, const protocol::endpoint &destination,
 SenderUdp::SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination )
 : mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
 {
-}
-	
-SenderUdp::SenderUdp( SenderUdp &&other ) noexcept
-: SenderBase( std::move( other ) ), mSocket( std::move(other.mSocket) ),
-	mLocalEndpoint( std::move( other.mLocalEndpoint ) ), mRemoteEndpoint( std::move( other.mRemoteEndpoint ) )
-{
-	if( mSocket->is_open() ) {
-		asio::error_code error;
-		mSocket->cancel( error );
-		if( error ) {
-			
-		}
-	}
-}
-
-SenderUdp& SenderUdp::operator=( SenderUdp &&other ) noexcept
-{
-	
 }
 	
 void SenderUdp::bindImpl()
@@ -1215,21 +1173,6 @@ ReceiverTcp::Connection::Connection( TcpSocketRef socket, ReceiverTcp *receiver 
 {
 }
 
-ReceiverTcp::Connection::Connection( Connection && other ) noexcept
-: mSocket( move( other.mSocket ) ), mReceiver( other.mReceiver ), mDataBuffer( move( other.mDataBuffer ) )
-{
-}
-
-ReceiverTcp::Connection& ReceiverTcp::Connection::operator=( Connection && other ) noexcept
-{
-	if( this != &other ) {
-		mSocket = move( other.mSocket );
-		mReceiver = other.mReceiver;
-		mDataBuffer = move( other.mDataBuffer );
-	}
-	return *this;
-}
-
 ReceiverTcp::Connection::~Connection()
 {
 	close();
@@ -1292,11 +1235,6 @@ void ReceiverTcp::Connection::read()
 		read();
 	});
 }
-	
-void ReceiverTcp::readFrom( const ReceiverTcp::Connection &connection )
-{
-	
-}
 
 ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
 : mIoService( service ), mAcceptor( mIoService ), mLocalEndpoint( protocol, port )
@@ -1328,8 +1266,8 @@ void ReceiverTcp::listenImpl()
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
 		if( ! error ) {
 			std::lock_guard<std::mutex> lock( mConnectionMutex );
-			mConnections.emplace_back( socket, this );
-			mConnections.back().read();
+			mConnections.emplace_back( new Connection( socket, this ) );
+			mConnections.back()->read();
 		}
 		else {
 			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
@@ -1348,7 +1286,7 @@ void ReceiverTcp::closeImpl()
 	mAcceptor.close();
 	std::lock_guard<std::mutex> lock( mConnectionMutex );
 	for( auto & connection : mConnections ) {
-		connection.close();
+		connection->close();
 	}
 	mConnections.clear();
 }

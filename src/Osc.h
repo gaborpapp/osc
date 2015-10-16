@@ -205,6 +205,8 @@ private:
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
 	
+	void appendDataBuffer( const void *begin, uint32_t size, uint32_t trailingZeros = 0 );
+	
 	//! Returns a complete byte array of this OSC message as a ByteBufferRef type.
 	//! The byte buffer is constructed lazily and is cached until the cache is
 	//! obsolete. Call to |data| and |size| perform the same caching.
@@ -564,8 +566,8 @@ protected:
 		Connection( const Connection &other ) = delete;
 		//! Non-copyable.
 		Connection& operator=( const Connection &other ) = delete;
-		Connection( Connection &&other ) noexcept;
-		Connection& operator=( Connection &&other ) noexcept;
+		Connection( Connection &&other ) = delete;
+		Connection& operator=( Connection &&other ) = delete;
 		
 		friend class ReceiverTcp;
 	};
@@ -577,9 +579,6 @@ protected:
 	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
 	
-	void readFrom( const Connection &connection );
-	void close( const Connection &connection );
-	
 	asio::io_service				&mIoService;
 	asio::ip::tcp::acceptor			mAcceptor;
 	asio::ip::tcp::endpoint			mLocalEndpoint;
@@ -587,7 +586,9 @@ protected:
 	SocketErrorHandler<protocol>	mSocketErrorHandler;
 	
 	std::mutex						mDataHandlerMutex, mConnectionMutex;
-	std::vector<Connection>			mConnections;
+	
+	using UniqueConnection = std::unique_ptr<Connection>;
+	std::vector<UniqueConnection>			mConnections;
 
 	friend class Connection;
 public:
