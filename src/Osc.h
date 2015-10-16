@@ -154,32 +154,51 @@ public:
 		
 		~Argument() = default;
 		
+		//! Returns the arguments type as an ArgType
 		ArgType		getArgType() const { return mType; }
+		//! Returns the arguments size, without trailing zeros or size int's taken into account.
 		uint32_t	getArgSize() const { return mSize; }
+		//! Returns the offset into the dataBuffer, where this Argument starts.
 		int32_t		getOffset() const { return mOffset; }
 		
+		//! Helper function to translate from ArgType to the spec's representation of that type.
 		static char translateArgTypeToChar( ArgType type );
+		//! Helper function to translate from the spec's character representation to the ArgType.
 		static ArgType translateCharToArgType( char type );
 		
+		//! returns the underlying argument as an int32.
 		int32_t		int32() const;
+		//! returns the underlying argument as an int64.
 		int64_t		int64() const;
+		//! returns the underlying argument as a float.
 		float		flt() const;
+		//! returns the underlying argument as a double.
 		double		dbl() const;
+		//! returns the underlying argument as a boolean.
 		bool		boolean() const;
+		//!
 		void		midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
+		//! Returns the underlying argument as a "deep-copied" buffer.
 		ci::Buffer	blob() const;
+		//!
 		void		blobData( const void **dataPtr, size_t *size ) const;
+		//! Returns the underlying argument as a char
 		char		character() const;
+		//! Returns the underlying argument as a string.
 		std::string string() const;
 		
-		bool operator==( const Argument &arg ) const;
+		//! Evaluates the equality of this with \a other
+		bool operator==( const Argument &other ) const;
 
 	private:
-		
-		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
+		//! Simple helper to stream a message's contents to the console.
 		void		outputValueToStream( std::ostream &ostream ) const;
+		//! Returns true, if before transporting this message, this argument needs a big endian swap
+		bool		needsEndianSwapForTransmit() const { return mNeedsEndianSwapForTransmit; }
+		//! Implements the swap for all types needing a swap.
 		void		swapEndianForTransmit( uint8_t* buffer ) const;
-		
+		//! Helper to check if the underlying type is able to be converted to the provided template
+		//! type \a T.
 		template<typename T>
 		bool convertible() const;
 		
@@ -192,10 +211,12 @@ public:
 		friend class Message;
 		friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	};
-	
+	//! Operator bracket returning an const Argument reference based on \a index.
 	const Argument& operator[]( uint32_t index ) const;
-	bool			operator==( const Message &message ) const;
-	bool			operator!=( const Message &message ) const;
+	//! Evaluates the equality of this with \a other
+	bool			operator==( const Message &other ) const;
+	//! Evaluates the inequality of this with \a other
+	bool			operator!=( const Message &other ) const;
 	
 private:
 	//! Helper to calculate how many zeros to buffer to create a 4 byte
@@ -225,8 +246,9 @@ private:
 	mutable bool			mIsCached;
 	mutable ByteBufferRef	mCache;
 	
-	/// Create the OSC message and store it in cache.
+	//! Create the OSC message and store it in cache.
 	void createCache() const;
+	//! Used by receiver to create the inner message.
 	bool bufferCache( uint8_t *data, size_t size );
 	
 	friend class Bundle;
