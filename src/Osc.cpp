@@ -907,11 +907,6 @@ SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination,
 	mRemoteEndpoint( destination )
 {
 }
-
-SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination )
-: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
-{
-}
 	
 void SenderTcp::bindImpl()
 {

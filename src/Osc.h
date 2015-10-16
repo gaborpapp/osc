@@ -407,7 +407,6 @@ public:
 			   const protocol::endpoint &destination,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	SenderTcp( const TcpSocketRef &socket, const asio::ip::tcp::endpoint &destination );
 	
 	virtual ~SenderTcp() = default;
 	
