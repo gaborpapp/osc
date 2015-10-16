@@ -279,21 +279,10 @@ void Message::append( const std::string& v )
 	appendDataBuffer( v.data(), v.size(), trailingZeros );
 }
 
-void Message::append( const char* v, size_t len )
-{
-	if( ! v || len == 0 ) return;
-	mIsCached = false;
-	auto trailingZeros = getTrailingZeros( len );
-	auto size = len + trailingZeros;
-	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
-	appendDataBuffer( v, len, trailingZeros );
-}
-
 void Message::appendBlob( void* blob, uint32_t size )
 {
 	mIsCached = false;
 	auto trailingZeros = getTrailingZeros( size );
-	auto totalBufferSize = 4 + size + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), size, true );
 	appendDataBuffer( &size, sizeof(uint32_t) );
 	appendDataBuffer( blob, size, trailingZeros );
@@ -512,21 +501,26 @@ void Argument::midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *da
 	*data2 = midiVal >> 24;
 }
 	
-ci::Buffer Argument::blob( bool deepCopy ) const
+ci::Buffer Argument::blob() const
 {
 	if( ! convertible<ci::Buffer>() )
 		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getArgType() );
 	
 	// skip the first 4 bytes, as they are the size
 	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mOwner->mDataBuffer[getOffset()+4] );
-	if( deepCopy ) {
-		ci::Buffer ret( getArgSize() );
-		memcpy( ret.getData(), data, getArgSize() );
-		return ret;
-	}
-	else {
-		return ci::Buffer( reinterpret_cast<void*>(  const_cast<uint8_t*>( data ) ), getArgSize() );
-	}
+	ci::Buffer ret( getArgSize() );
+	memcpy( ret.getData(), data, getArgSize() );
+	return ret;
+}
+	
+void Argument::blobData( const void **dataPtr, size_t *size ) const
+{
+	if( ! convertible<ci::Buffer>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getArgType() );
+	
+	// skip the first 4 bytes, as they are the size
+	*dataPtr = reinterpret_cast<const void*>( &mOwner->mDataBuffer[getOffset()+4] );
+	*size = getArgSize();
 }
 	
 char Argument::character() const
@@ -631,10 +625,16 @@ void Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *
 	dataView.midi( port, status, data1, data2 );
 }
 
-ci::Buffer Message::getBlob( uint32_t index, bool deepCopy ) const
+ci::Buffer Message::getBlob( uint32_t index ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
-	return dataView.blob( deepCopy );
+	return dataView.blob();
+}
+	
+void Message::getBlobData( uint32_t index, const void **dataPtr, size_t *size ) const
+{
+	auto &dataView = getDataView<ci::Buffer>( index );
+	dataView.blobData( dataPtr, size );
 }
 
 bool Message::bufferCache( uint8_t *data, size_t size )
@@ -750,16 +750,6 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 		j++;
 	}
 	
-	return true;
-}
-
-bool Message::compareTypes( const std::string &types )
-{
-	int i = 0;
-	for( auto & dataView : mDataViews ) {
-		if( Argument::translateArgTypeToChar( dataView.getArgType() ) != types[i++] )
-			return false;
-	}
 	return true;
 }
 

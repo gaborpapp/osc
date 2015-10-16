@@ -75,9 +75,6 @@ public:
 	void append( float v );
 	//! Appends a string to the back of the message.
 	void append( const std::string& v );
-	//! Appends a string to the back of the message.
-	void append( const char* v, size_t len );
-	void append( const char* v ) = delete;
 	//! Appends an osc blob to the back of the message.
 	void appendBlob( void* blob, uint32_t size );
 	//! Appends an osc blob to the back of the message.
@@ -128,24 +125,21 @@ public:
 	
 	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
 	//! Returns the blob, as a ci::Buffer, located at \a index.
-	ci::Buffer	getBlob( uint32_t index, bool deepCopy = false ) const;
+	ci::Buffer	getBlob( uint32_t index ) const;
+	//!
+	void getBlobData( uint32_t index, const void **dataPtr, size_t *size ) const;
 	
 	//! Returns the argument type located at \a index.
 	ArgType		getArgType( uint32_t index ) const;
 	
-	bool compareTypes( const std::string &types );
-	
-	/// Sets the OSC address of this message.
-	/// @param[in] address The new OSC address.
+	//! Sets the OSC address of this message.
 	void setAddress( const std::string& address );
-	
-	/// Returns the OSC address of this message.
+	//! Returns the OSC address of this message.
 	const std::string& getAddress() const { return mAddress; }
 	
 	//! Returns the size of this OSC message as a complete packet.
 	//! Performs a lazy cache
 	size_t size() const;
-	
 	/// Clears the message, specifically any cache, dataViews, and address.
 	void clear();
 	
@@ -173,7 +167,8 @@ public:
 		double		dbl() const;
 		bool		boolean() const;
 		void		midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
-		ci::Buffer	blob( bool deepCopy = false ) const;
+		ci::Buffer	blob() const;
+		void		blobData( const void **dataPtr, size_t *size ) const;
 		char		character() const;
 		std::string string() const;
 		
@@ -203,12 +198,20 @@ public:
 	bool			operator!=( const Message &message ) const;
 	
 private:
-	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
+	//! Helper to calculate how many zeros to buffer to create a 4 byte
+	static uint8_t getTrailingZeros( size_t bufferSize )
+	{
+		auto mod4ByteAlignment = bufferSize % 4;
+		return mod4ByteAlignment == 0 ? 0 : 4 - mod4ByteAlignment;
+	}
+	//! Helper to get current offset into the buffer.
 	size_t getCurrentOffset() { return mDataBuffer.size(); }
 	
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
 	
+	//! Helper to to insert data starting at \a begin for \a with resize/fill in the amount
+	//! of \a trailingZeros
 	void appendDataBuffer( const void *begin, uint32_t size, uint32_t trailingZeros = 0 );
 	
 	//! Returns a complete byte array of this OSC message as a ByteBufferRef type.
