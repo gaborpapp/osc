@@ -43,8 +43,6 @@
 		8AC1CA0FCD2D4ED19E544C92 /* Resources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Resources.h; path = ../include/Resources.h; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* Test.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Test.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A3083A29E03041BFB198D8E5 /* TestApp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; name = TestApp.cpp; path = ../src/TestApp.cpp; sourceTree = "<group>"; };
-		B3DB89281BA0DDE100961814 /* AnomalyOSC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AnomalyOSC.cpp; sourceTree = "<group>"; };
-		B3DB89291BA0DDE100961814 /* AnomalyOSC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AnomalyOSC.h; sourceTree = "<group>"; };
 		B3EE6DEF1BCF0037002798EA /* Osc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Osc.cpp; sourceTree = "<group>"; };
 		B3EE6DF01BCF0037002798EA /* Osc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Osc.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -173,8 +171,6 @@
 		B3DB89271BA0DDE100961814 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				B3DB89281BA0DDE100961814 /* AnomalyOSC.cpp */,
-				B3DB89291BA0DDE100961814 /* AnomalyOSC.h */,
 				B3EE6DEF1BCF0037002798EA /* Osc.cpp */,
 				B3EE6DF01BCF0037002798EA /* Osc.h */,
 			);

@@ -31,7 +31,8 @@ class TestApp : public App {
 
 TestApp::TestApp()
 : App(), mReceiver( 10000 ), mSender( 12345, "127.0.0.1", 10000 )
-{
+{	
+	mReceiver.bind();
 	mReceiver.listen();
 	mReceiver.setListener( "/app/1",
 						  []( const osc::Message &message ){
@@ -71,6 +72,7 @@ void TestApp::update()
 {
 	if( ! mIsConnected ) {
 //		mSender.connect();
+		mSender.bind();
 		mIsConnected = true;
 	}
 	else {
@@ -78,12 +80,12 @@ void TestApp::update()
 		i++;
 		osc::Message message( "/app/1" );
 		message.append( i );
-//		mSender.send( message );
+		mSender.send( message );
 		osc::Message message2( "/app/2" );
 		static std::string test("testing");
 		test += ".";
 		message2.append( test );
-//		mSender.send( message2 );
+		mSender.send( message2 );
 		osc::Message message3( "/app/3" );
 		static TestStruct mTransmitStruct{ 0, 0, 0 };
 		mTransmitStruct.myInt += 45;
@@ -97,7 +99,7 @@ void TestApp::update()
 		mTransmitStruct.myDouble += 1.01;
 		message3.appendBlob( &mTransmitStruct, sizeof(TestStruct) );
 		//		cout << message3 << endl;
-//		mSender.send( message3 );
+		mSender.send( message3 );
 		osc::Bundle bundle;
 		bundle.append( message );
 		bundle.append( message2 );

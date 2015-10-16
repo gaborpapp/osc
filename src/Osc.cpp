@@ -434,7 +434,7 @@ const Argument& Message::operator[]( uint32_t index ) const
 
 int32_t	Argument::int32() const
 {
-	if( ! convertible<int32_t>() ) // TODO: change the type to typeid print out.
+	if( ! convertible<int32_t>() )
 		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_32, getArgType() );
 	
 	return *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);;
@@ -796,88 +796,143 @@ void Bundle::setTimetag( uint64_t ntp_time )
 
 void Bundle::appendData( const ByteBufferRef& data )
 {
-	int32_t a = htonl( data->size() );
-	ByteArray<4> b;
-	memcpy( b.data(), reinterpret_cast<uint8_t*>(&a), 4 );
-	mDataBuffer->insert( mDataBuffer->end(), b.begin(), b.end() );
+	// Size is already the first 4 bytes of every message.
 	mDataBuffer->insert( mDataBuffer->end(), data->begin(), data->end() );
 }
 
 ByteBufferRef Bundle::getSharedBuffer() const
 {
-	int32_t a = htonl( size() );
+	int32_t a = htonl( size() - 4 );
 	memcpy( mDataBuffer->data(), reinterpret_cast<uint8_t*>( &a ), 4 );
 	return mDataBuffer;
+}
+	
+////////////////////////////////////////////////////////////////////////////////////////
+//// SenderBase
+	
+SenderBase::SenderBase( SenderBase &&other ) noexcept
+: mSocketTransportErrorHandler( std::move( other.mSocketTransportErrorHandler ) )
+{
+}
+	
+SenderBase& SenderBase::operator=( SenderBase &&other ) noexcept
+{
+	if( this != &other ) {
+		mSocketTransportErrorHandler = std::move( other.mSocketTransportErrorHandler );
+	}
+	return *this;
+}
+	
+void SenderBase::setSocketTransportErrorHandler( SocketTransportErrorHandler errorHandler )
+{
+	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+	mSocketTransportErrorHandler = errorHandler;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderUdp
 
 SenderUdp::SenderUdp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const protocol &protocol, asio::io_service &service )
-: mSocket( new udp::socket( service, udp::endpoint( protocol, localPort ) ) ),
+: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( udp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
 }
 	
 SenderUdp::SenderUdp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, asio::io_service &service )
-: mSocket( new udp::socket( service, udp::endpoint( protocol, localPort ) ) ),
+: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
 {
 }
 	
 SenderUdp::SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination )
-: mSocket( socket ), mRemoteEndpoint( destination )
+: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
 {
+}
+	
+SenderUdp::SenderUdp( SenderUdp &&other ) noexcept
+: SenderBase( std::move( other ) ), mSocket( std::move(other.mSocket) ),
+	mLocalEndpoint( std::move( other.mLocalEndpoint ) ), mRemoteEndpoint( std::move( other.mRemoteEndpoint ) )
+{
+	if( mSocket->is_open() ) {
+		asio::error_code error;
+		mSocket->cancel( error );
+		if( error ) {
+			
+		}
+	}
+}
+
+SenderUdp& SenderUdp::operator=( SenderUdp &&other ) noexcept
+{
+	
+}
+	
+void SenderUdp::bindImpl()
+{
+	mSocket->open( mLocalEndpoint.protocol() );
+	mSocket->bind( mLocalEndpoint );
 }
 	
 void SenderUdp::sendImpl( const ByteBufferRef &data )
 {
-	// TODO: make sure this math works. we're getting rid of the first integer which is size.
+	// data's first 4 bytes(int) comprise the size of the buffer, which datagram doesn't need.
 	mSocket->async_send_to( asio::buffer( data->data() + 4, data->size() - 4 ), mRemoteEndpoint,
 	// copy data pointer to persist the asynchronous send
-	[&, data]( const asio::error_code& error, size_t bytesTransferred ) {
-		// TODO: Figure out what to do with errors
+	[&, data]( const asio::error_code& error, size_t bytesTransferred )
+	{
 		if( error ) {
 			// derive oscAddress
 			std::string oscAddress;
 			if( ! data->empty() )
-				oscAddress = ( (const char*)(data.get() + 4) );
+				oscAddress = std::string( (const char*)(data.get() + 4) );
 			
-//			if( mErrorHandler ) {
-//				mErrorHandler( error.message(), mRemoteEndpoint.address().to_string(), oscAddress );
-//			}
-//			else
-			// TODO: Figure out what to do with errors
+			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+			if( mSocketTransportErrorHandler ) {
+				mSocketTransportErrorHandler( error, oscAddress );
+			}
+			else
 				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
 		}
-		else {
-			//		cout << "SENDER: bytestransferred: " << bytesTransferred << " | bytesToTransfer: " << byte_buffer->size() << endl;
-		}
 	});
+}
+	
+void SenderUdp::closeImpl()
+{
+	asio::error_code error;
+	mSocket->close( error );
+	if( error ) {
+		std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+		if( mSocketTransportErrorHandler )
+			mSocketTransportErrorHandler( error, "" );
+		else
+			CI_LOG_E("Closing SenderUdp with error: " << error);
+	}
 }
 	
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderTcp
 
 SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service )
-: mSocket( new tcp::socket( service, tcp::endpoint( protocol, localPort ) ) ),
+: mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( tcp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
-	
 }
 	
 SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, io_service &service )
-: mSocket( new tcp::socket( service, tcp::endpoint( protocol, localPort ) ) ),
+: mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
-
 {
-	
 }
 
 SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination )
-: mSocket( socket ), mRemoteEndpoint( destination )
+: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
 {
+}
 	
+void SenderTcp::bindImpl()
+{
+	mSocket->open( mLocalEndpoint.protocol() );
+	mSocket->bind( mLocalEndpoint );
 }
 	
 void SenderTcp::connect()
@@ -892,34 +947,79 @@ void SenderTcp::connect()
 void SenderTcp::sendImpl( const ByteBufferRef &data )
 {
 	mSocket->async_send( asio::buffer( *data ),
-	[&, data]( const asio::error_code& error, size_t bytesTransferred ) {
-		// TODO: Figure out what to do with errors
+	// copy data pointer to persist the asynchronous send
+	[&, data]( const asio::error_code& error, size_t bytesTransferred )
+	{
 		if( error ) {
 			// derive oscAddress
 			std::string oscAddress;
 			if( ! data->empty() )
-				oscAddress = ( (const char*)(data.get() + 4) );
+				oscAddress = std::string( (const char*)(data.get() + 4) );
 			
-			//			if( mErrorHandler ) {
-			//				mErrorHandler( error.message(), mRemoteEndpoint.address().to_string(), oscAddress );
-			//			}
-			//			else
-			// TODO: Figure out what to do with errors
-			CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
-		}
-		else {
-			//		cout << "SENDER: bytestransferred: " << bytesTransferred << " | bytesToTransfer: " << byte_buffer->size() << endl;
+			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+			if( mSocketTransportErrorHandler ) {
+				mSocketTransportErrorHandler( error, oscAddress );
+			}
+			else
+				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
 		}
 	});
 }
 	
 /////////////////////////////////////////////////////////////////////////////////////////
-//// Decode
+//// ReceiverBase
 	
-namespace decode {
+void ReceiverBase::setListener( const std::string &address, Listener listener )
+{
+	std::lock_guard<std::mutex> lock( mListenerMutex );
+	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
+	[address]( const std::pair<std::string, Listener> &listener ) {
+		  return address == listener.first;
+	});
+	if( foundListener != mListeners.end() ) {
+		foundListener->second = listener;
+	}
+	else {
+		mListeners.push_back( { address, listener } );
+	}
+}
 
+void ReceiverBase::removeListener( const std::string &address )
+{
+	std::lock_guard<std::mutex> lock( mListenerMutex );
+	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
+	[address]( const std::pair<std::string, Listener> &listener ) {
+		  return address == listener.first;
+	});
+	if( foundListener != mListeners.end() ) {
+		mListeners.erase( foundListener );
+	}
+}
+
+void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
+{
+	std::vector<Message> messages;
+	decodeData( data, size, messages );
+	if( messages.empty() ) return;
+	
+	std::lock_guard<std::mutex> lock( mListenerMutex );
+	// iterate through all the messages and find matches with registered methods
+	for( auto & message : messages ) {
+		bool dispatchedOnce = false;
+		for( auto & listener : mListeners ) {
+			if( patternMatch( message.getAddress(), listener.first ) ) {
+				listener.second( message );
+				dispatchedOnce = true;
+			}
+		}
+		if( ! dispatchedOnce ) {
+			CI_LOG_W("Message: " << message.getAddress() << " doesn't have a listener. Disregarding.");
+		}
+	}
+}
+	
 // TODO: Better error handling here.
-bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
+bool ReceiverBase::decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag ) const
 {
 	if( ! memcmp( data, "#bundle\0", 8 ) ) {
 		data += 8; size -= 8;
@@ -933,7 +1033,7 @@ bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, u
 			seg_size = ntohl( seg_size );
 			if( seg_size > size ) return false;
 			// Need to move the data pointer for bundles up 4 because when attaching data to a bundle, I don't know what protocol is being used.
-			if( !decodeData( data + 4, seg_size - 4, messages, ntohll( timestamp ) ) ) return false;
+			if( !decodeData( data, seg_size, messages, ntohll( timestamp ) ) ) return false;
 			data += seg_size; size -= seg_size;
 		}
 	}
@@ -944,9 +1044,8 @@ bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, u
 	return true;
 }
 
-bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag )
+bool ReceiverBase::decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag ) const
 {
-	//	ParsedMessage m{ timetag, Message( std::string("") ) };
 	Message message;
 	if( ! message.bufferCache( data, size ) )
 		return false;
@@ -955,8 +1054,7 @@ bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages
 	return true;
 }
 
-
-bool patternMatch( const std::string& lhs, const std::string& rhs )
+bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs ) const
 {
 	bool negate = false;
 	bool mismatched = false;
@@ -1052,178 +1150,73 @@ bool patternMatch( const std::string& lhs, const std::string& rhs )
 	else return false;
 }
 	
-} // decode
-	
-/////////////////////////////////////////////////////////////////////////////////////////
-//// ReceiverBase
-	
-void ReceiverBase::setListener( const std::string &address, Listener listener )
-{
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-									  [address]( const std::pair<std::string, Listener> &listener ) {
-										  return address == listener.first;
-									  });
-	if( foundListener != mListeners.end() ) {
-		foundListener->second = listener;
-	}
-	else {
-		mListeners.push_back( { address, listener } );
-	}
-}
-
-void ReceiverBase::removeListener( const std::string &address )
-{
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	auto foundListener = std::find_if( mListeners.begin(), mListeners.end(),
-									  [address]( const std::pair<std::string, Listener> &listener ) {
-										  return address == listener.first;
-									  });
-	if( foundListener != mListeners.end() ) {
-		mListeners.erase( foundListener );
-	}
-}
-	
-uint64_t ReceiverBase::getClock()
-{
-	uint64_t ntp_time = time::get_current_ntp_time();
-	
-	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
-	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
-	
-	if( usecs < 0 ) {
-		secs += usecs / 1000000;
-		usecs += ( usecs / 1000000 ) * 1000000;
-	}
-	else {
-		secs += usecs / 1000000;
-		usecs -= ( usecs / 1000000 ) * 1000000;
-	}
-	
-	return ( secs << 32 ) + usecs;
-}
-
-uint64_t ReceiverBase::getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
-{
-	uint64_t ntp_time = getClock();
-	
-	// Convert to unix timestamp.
-	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
-	
-	auto tm = std::localtime( &sec_since_epoch );
-	if( year ) *year = tm->tm_year + 1900;
-	if( month ) *month = tm->tm_mon + 1;
-	if( day ) *day = tm->tm_mday;
-	if( hours ) *hours = tm->tm_hour;
-	if( minutes ) *minutes = tm->tm_min;
-	if( seconds )*seconds = tm->tm_sec;
-	
-	return ntp_time;
-}
-
-std::string ReceiverBase::getClockString( bool includeDate )
-{
-	uint32_t year, month, day, hours, minutes, seconds;
-	getClock( &year, &month, &day, &hours, &minutes, &seconds );
-	
-	char buffer[128];
-	
-	if( includeDate )
-		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
-	else
-		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
-	
-	return std::string( buffer );
-}
-
-void ReceiverBase::setClock( uint64_t ntp_time )
-{
-	uint64_t current_ntp_time = time::get_current_ntp_time();
-	
-	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
-	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
-}
-
-void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size )
-{
-	using namespace decode;
-	std::vector<Message> messages;
-	
-	if( ! decodeData( data, size, messages ) ) return;
-	CI_ASSERT( messages.size() > 0 );
-	
-	std::lock_guard<std::mutex> lock( mListenerMutex );
-	// iterate through all the messages and find matches with registered methods
-	//! TODO: figure out what to do here. for messages that don't match and also messages that aren't yet ready to
-	//! be sent.
-	for( auto & message : messages ) {
-		bool dispatchedOnce = false;
-		for( auto & listener : mListeners ) {
-			if( patternMatch( message.getAddress(), listener.first ) ) {
-				listener.second( message );
-				dispatchedOnce = true;
-			}
-		}
-		if( ! dispatchedOnce ) {
-			
-		}
-	}
-}
-	
 /////////////////////////////////////////////////////////////////////////////////////////
 //// ReceiverUdp
 	
-ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_service &io )
-: mSocket( new udp::socket( io, udp::endpoint( protocol, port ) ) ), mAmountToReceive( 4096 )
+ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_service &service )
+: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, port ), mAmountToReceive( 4096 )
 {
-	asio::socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
 }
 
 ReceiverUdp::ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
-: mSocket( new udp::socket( io, localEndpoint ) ), mAmountToReceive( 4096 )
+: mSocket( new udp::socket( io ) ), mLocalEndpoint( localEndpoint ), mAmountToReceive( 4096 )
 {
-	asio::socket_base::reuse_address reuse( true );
-	mSocket->set_option( reuse );
 }
 
 ReceiverUdp::ReceiverUdp( UdpSocketRef socket )
-: mSocket( socket ), mAmountToReceive( 4096 )
+: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mAmountToReceive( 4096 )
 {
+}
+	
+void ReceiverUdp::bindImpl()
+{
+	mSocket->open( mLocalEndpoint.protocol() );
+	mSocket->bind( mLocalEndpoint );
 }
 
 void ReceiverUdp::listenImpl()
 {
 	auto tempBuffer = mBuffer.prepare( mAmountToReceive );
-	
-	mSocket->async_receive( tempBuffer,
-	[&]( const error_code &error, size_t bytesTransferred ) {
-		//! TODO: insert error handling.
-		mBuffer.commit( bytesTransferred );
-		auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
-		data[ bytesTransferred ] = 0;
-		istream stream( &mBuffer );
-		stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
-		// TODO: figure out whether we need this + 4, maybe there's someway to remove the size earlier from the streambuf
-		// right now it represents skipping the size.
-		dispatchMethods( data.get(), bytesTransferred );
-		if( ! error )
-			listen();
-		else
-			close();
+	auto uniqueEndpoint = std::make_shared<asio::ip::udp::endpoint>();
+	mSocket->async_receive_from( tempBuffer, *uniqueEndpoint,
+	[&, uniqueEndpoint]( const error_code &error, size_t bytesTransferred ) {
+		if( error ) {
+			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+			if( mSocketErrorHandler ) {
+				mSocketErrorHandler( error, *uniqueEndpoint );
+			}
+			else {
+				CI_LOG_E( error.message() << ", didn't receive message from " << uniqueEndpoint->address().to_string() );
+			}
+		}
+		else {
+			mBuffer.commit( bytesTransferred );
+			auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
+			data[ bytesTransferred ] = 0;
+			istream stream( &mBuffer );
+			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
+			dispatchMethods( data.get(), bytesTransferred );
+		}
+		listen();
 	});
+}
+	
+void ReceiverUdp::setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler )
+{
+	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+	mSocketErrorHandler = errorHandler;
 }
 	
 /////////////////////////////////////////////////////////////////////////////////////////
 //// ReceiverTcp
 
-ReceiverTcp::Connection::Connection( TcpSocketRef socket, ReceiverTcp *transport )
-: mSocket( socket ), mTransport( transport ), mDataBuffer( 4096 )
+ReceiverTcp::Connection::Connection( TcpSocketRef socket, ReceiverTcp *receiver )
+: mSocket( socket ), mReceiver( receiver ), mDataBuffer( 4096 )
 {
 }
 
 ReceiverTcp::Connection::Connection( Connection && other ) noexcept
-: mSocket( move( other.mSocket ) ), mTransport( other.mTransport ), mDataBuffer( move( other.mDataBuffer ) )
+: mSocket( move( other.mSocket ) ), mReceiver( other.mReceiver ), mDataBuffer( move( other.mDataBuffer ) )
 {
 }
 
@@ -1231,7 +1224,7 @@ ReceiverTcp::Connection& ReceiverTcp::Connection::operator=( Connection && other
 {
 	if( this != &other ) {
 		mSocket = move( other.mSocket );
-		mTransport = other.mTransport;
+		mReceiver = other.mReceiver;
 		mDataBuffer = move( other.mDataBuffer );
 	}
 	return *this;
@@ -1240,7 +1233,14 @@ ReceiverTcp::Connection& ReceiverTcp::Connection::operator=( Connection && other
 ReceiverTcp::Connection::~Connection()
 {
 	close();
-	mTransport = nullptr;
+	mReceiver = nullptr;
+}
+	
+void ReceiverTcp::Connection::close()
+{
+	if( mSocket ) {
+		mSocket->close();
+	}
 }
 	
 using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
@@ -1269,51 +1269,77 @@ void ReceiverTcp::Connection::read()
 {
 	asio::async_read_until( *mSocket, mBuffer, &readMatchCondition,
 	[&]( const asio::error_code &error, size_t bytesTransferred ) {
-		auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
-		data[ bytesTransferred ] = 0;
-		istream stream( &mBuffer );
-		stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
-		{
-			std::lock_guard<std::mutex> lock( mTransport->mDataHandlerMutex );
-			mTransport->dispatchMethods( (data.get() + 4), bytesTransferred );
+		if( error ) {
+			auto remote = getRemoteEndpoint();
+			std::lock_guard<std::mutex> lock( mReceiver->mSocketErrorHandlerMutex );
+			if( mReceiver->mSocketErrorHandler ) {
+				mReceiver->mSocketErrorHandler( error, remote );
+			}
+			else {
+				CI_LOG_E( error.message() << ", didn't receive message from " << remote.address().to_string() );
+			}
 		}
-		// TODO: Figure these errors out.
+		else {
+			auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
+			data[ bytesTransferred ] = 0;
+			istream stream( &mBuffer );
+			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
+			{
+				std::lock_guard<std::mutex> lock( mReceiver->mDataHandlerMutex );
+				mReceiver->dispatchMethods( (data.get() + 4), bytesTransferred );
+			}
+		}
 		read();
 	});
 }
-
-ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
-: mIoService( service ), mAcceptor( mIoService, asio::ip::tcp::endpoint( protocol, port ) )
+	
+void ReceiverTcp::readFrom( const ReceiverTcp::Connection &connection )
 {
 	
 }
 
-ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service )
-: mIoService( service ), mAcceptor( mIoService, localEndpoint )
+ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
+: mIoService( service ), mAcceptor( mIoService ), mLocalEndpoint( protocol, port )
 {
+}
+
+ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service )
+: mIoService( service ), mAcceptor( mIoService ), mLocalEndpoint( localEndpoint )
+{
+}
 	
+void ReceiverTcp::bindImpl()
+{
+	mAcceptor.open( mLocalEndpoint.protocol() );
+	mAcceptor.bind( mLocalEndpoint );
+}
+	
+void ReceiverTcp::setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler )
+{
+	std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+	mSocketErrorHandler = errorHandler;
 }
 
 void ReceiverTcp::listenImpl()
 {
 	auto socket = TcpSocketRef( new tcp::socket( mIoService ) );
 	
-	if( ! mAcceptor.is_open() );
-	//		mAcceptor.open();
-	
 	mAcceptor.async_accept( *socket, std::bind(
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
-		   CI_LOG_V("Accepted a connection");
-		   if( ! error ) {
-			   std::lock_guard<std::mutex> lock( mConnectionMutex );
-			   mConnections.emplace_back( socket, this );
-			   mConnections.back().read();
-		   }
-		   else {
-			   // TODO: Figure out error interface.
-			   CI_LOG_E(error.message());
-		   }
-		   listen();
+		if( ! error ) {
+			std::lock_guard<std::mutex> lock( mConnectionMutex );
+			mConnections.emplace_back( socket, this );
+			mConnections.back().read();
+		}
+		else {
+			std::lock_guard<std::mutex> lock( mSocketErrorHandlerMutex );
+			if( mSocketErrorHandler ) {
+				mSocketErrorHandler( error, protocol::endpoint() );
+			}
+			else
+				CI_LOG_E("Accept: " << error.message());
+		}
+		listen();
 	}, socket, _1 ) );
 }
 
@@ -1357,6 +1383,66 @@ uint64_t get_current_ntp_time()
 	auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
 	
 	return ( sec << 32 ) + ( usec % 1000000L );
+}
+	
+uint64_t getClock()
+{
+	uint64_t ntp_time = time::get_current_ntp_time();
+	
+	uint64_t secs = ( ntp_time >> 32 ) + sTimeOffsetSecs;
+	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + sTimeOffsetUsecs;
+	
+	if( usecs < 0 ) {
+		secs += usecs / 1000000;
+		usecs += ( usecs / 1000000 ) * 1000000;
+	}
+	else {
+		secs += usecs / 1000000;
+		usecs -= ( usecs / 1000000 ) * 1000000;
+	}
+	
+	return ( secs << 32 ) + usecs;
+}
+
+uint64_t getClock( uint32_t *year, uint32_t *month, uint32_t *day, uint32_t *hours, uint32_t *minutes, uint32_t *seconds )
+{
+	uint64_t ntp_time = getClock();
+	
+	// Convert to unix timestamp.
+	std::time_t sec_since_epoch = ( ntp_time - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
+	
+	auto tm = std::localtime( &sec_since_epoch );
+	if( year ) *year = tm->tm_year + 1900;
+	if( month ) *month = tm->tm_mon + 1;
+	if( day ) *day = tm->tm_mday;
+	if( hours ) *hours = tm->tm_hour;
+	if( minutes ) *minutes = tm->tm_min;
+	if( seconds )*seconds = tm->tm_sec;
+	
+	return ntp_time;
+}
+
+std::string getClockString( bool includeDate )
+{
+	uint32_t year, month, day, hours, minutes, seconds;
+	getClock( &year, &month, &day, &hours, &minutes, &seconds );
+	
+	char buffer[128];
+	
+	if( includeDate )
+		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
+	else
+		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
+	
+	return std::string( buffer );
+}
+
+void setClock( uint64_t ntp_time )
+{
+	uint64_t current_ntp_time = time::get_current_ntp_time();
+	
+	sTimeOffsetSecs = ( ntp_time >> 32 ) - ( current_ntp_time >> 32 );
+	sTimeOffsetUsecs = ( ntp_time & uint32_t( ~0 ) ) - ( current_ntp_time & uint32_t( ~0 ) );
 }
 
 } // namespace time
