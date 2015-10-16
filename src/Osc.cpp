@@ -888,6 +888,30 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 	});
 }
 	
+void SenderUdp::broadcastImpl( const ByteBufferRef &data )
+{
+	udp::endpoint broadcastEnd( asio::ip::address_v4::broadcast(), mRemoteEndpoint.port() );
+	mSocket->set_option( asio::socket_base::broadcast(true) );
+	mSocket->async_send_to( asio::buffer( data->data() + 4, data->size() - 4 ), broadcastEnd,
+	[&, data]( const asio::error_code& error, size_t bytesTransferred )
+	{
+		if( error ) {
+			// derive oscAddress
+			std::string oscAddress;
+			if( ! data->empty() )
+				oscAddress = std::string( (const char*)(data.get() + 4) );
+			
+			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
+			if( mSocketTransportErrorFn ) {
+				mSocketTransportErrorFn( error, oscAddress );
+			}
+			else
+				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
+		}
+		mSocket->set_option( asio::socket_base::broadcast(false) );
+	});
+}
+	
 void SenderUdp::closeImpl()
 {
 	mSocket->close();
@@ -906,6 +930,12 @@ SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination,
 : mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
 {
+}
+	
+SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination )
+: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
+{
+	
 }
 	
 void SenderTcp::bindImpl()
@@ -1264,19 +1294,24 @@ void ReceiverTcp::Connection::read()
 }
 
 ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
-	: mAcceptor( service ), mLocalEndpoint( protocol, port )
+: mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( protocol, port )
 {
 }
 
 ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service )
-: mAcceptor( service ), mLocalEndpoint( localEndpoint )
+: mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( localEndpoint )
+{
+}
+	
+ReceiverTcp::ReceiverTcp( AcceptorRef acceptor )
+: mAcceptor( acceptor ), mLocalEndpoint( mAcceptor->local_endpoint() )
 {
 }
 	
 void ReceiverTcp::bindImpl()
 {
-	mAcceptor.open( mLocalEndpoint.protocol() );
-	mAcceptor.bind( mLocalEndpoint );
+	mAcceptor->open( mLocalEndpoint.protocol() );
+	mAcceptor->bind( mLocalEndpoint );
 }
 	
 void ReceiverTcp::setSocketTransportErrorFn( SocketTransportErrorFn<protocol> errorFn )
@@ -1287,11 +1322,15 @@ void ReceiverTcp::setSocketTransportErrorFn( SocketTransportErrorFn<protocol> er
 
 void ReceiverTcp::listenImpl()
 {
-	auto socket = TcpSocketRef( new tcp::socket( mAcceptor.get_io_service() ) );
+	mAcceptor->listen();
+	accept();
+}
 	
-	mAcceptor.listen();
-	
-	mAcceptor.async_accept( *socket, std::bind(
+void ReceiverTcp::accept()
+{
+	auto socket = TcpSocketRef( new tcp::socket( mAcceptor->get_io_service() ) );
+
+	mAcceptor->async_accept( *socket, std::bind(
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
 		if( ! error ) {
 			std::lock_guard<std::mutex> lock( mConnectionMutex );
@@ -1306,13 +1345,13 @@ void ReceiverTcp::listenImpl()
 			else
 				CI_LOG_E("Accept: " << error.message());
 		}
-		listen();
+		accept();
 	}, socket, _1 ) );
 }
 
 void ReceiverTcp::closeImpl()
 {
-	mAcceptor.close();
+	mAcceptor->close();
 	std::lock_guard<std::mutex> lock( mConnectionMutex );
 	for( auto & connection : mConnections ) {
 		connection->close();

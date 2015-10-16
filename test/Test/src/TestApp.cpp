@@ -9,6 +9,8 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
+#define TEST_UDP 0
+
 struct TestStruct {
 	int myInt;
 	float myFloat;
@@ -18,13 +20,19 @@ struct TestStruct {
 class TestApp : public App {
   public:
 	TestApp();
-	void setup() override;
-	void mouseDown( MouseEvent event ) override;
 	void update() override;
-	void draw() override;
+	
+#if defined TEST_UDP
+	void sendMessageUdp( const osc::Message &message );
 	
 	osc::ReceiverUdp	mReceiver;
 	osc::SenderUdp		mSender;
+#else
+	void sendMessageTcp( const osc::Message &message );
+	
+	osc::ReceiverTcp	mReceiver;
+	osc::SenderTcp		mSender;
+#endif
 	osc::Message		mMessage;
 	
 	bool mIsConnected = false;
@@ -113,23 +121,17 @@ TestApp::TestApp()
 	});
 }
 
-void TestApp::setup()
-{
-}
-
-void TestApp::mouseDown( MouseEvent event )
-{
-	
-}
-
 void TestApp::update()
 {
 	if( ! mIsConnected ) {
 		mSender.bind();
-//		mSender.connect();
+#if ! defined TEST_UDP
+		mSender.connect();
+#endif
 		mIsConnected = true;
 	}
 	else {
+		
 		static int i = 245;
 		i++;
 		static std::string test("testing");
@@ -157,16 +159,33 @@ void TestApp::update()
 		message.append( 28.4 );
 		message.append( true );
 		
-		mSender.send( message );
-		
+#if defined TEST_UDP
+		sendMessageUdp( message );
+#else
+		sendMessageTcp( message );
+#endif
 		mMessage = std::move( message );
 		cout << mMessage << endl;
 	}
 }
 
-void TestApp::draw()
+#if defined TEST_UDP
+void TestApp::sendMessageUdp( const osc::Message &message )
 {
-	gl::clear( Color( 0, 0, 0 ) ); 
+	if( getElapsedFrames() % 2 == 0 ) {
+		cout << "broadcasting" << endl;
+		mSender.broadcast( message );
+	}
+	else {
+		cout << "sending regularly" << endl;
+		mSender.send( message );
+	}
 }
+#else
+void TestApp::sendMessageTcp( const osc::Message &message )
+{
+	mSender.send( message );
+}
+#endif
 
 CINDER_APP( TestApp, RendererGl )
