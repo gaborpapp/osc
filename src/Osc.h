@@ -176,6 +176,8 @@ public:
 		ci::Buffer	blob( bool deepCopy = false ) const;
 		char		character() const;
 		std::string string() const;
+		
+		bool operator==( const Argument &arg ) const;
 
 	private:
 		
@@ -197,6 +199,8 @@ public:
 	};
 	
 	const Argument& operator[]( uint32_t index ) const;
+	bool			operator==( const Message &message ) const;
+	bool			operator!=( const Message &message ) const;
 	
 private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
@@ -418,9 +422,7 @@ public:
 //! interface without implementing any of the networking layer.
 class ReceiverBase {
 public:
-	//! Alias function that represents a general error handler for the socket. Note: for some errors
-	//! there'll not be an accompanying endpoint, or it'll not have a value set. These errors have
-	//! nothing to do with transport but other socket operations like bind and open. To see more about
+	//! Alias function that represents a general error handler for the socket. To see more about
 	//! asio's error_codes, look at "asio/error.hpp".
 	template<typename Protocol>
 	using SocketErrorHandler = std::function<void( const asio::error_code &/*error*/,
@@ -496,6 +498,7 @@ public:
 	//! Returns the local udp::endpoint of the underlying socket.
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
+	//! Sets the underlying socketErrorHandler based on the asio::io::tcp protocol.
 	void setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler );
 	
 protected:
@@ -537,6 +540,7 @@ public:
 	// TODO: Decide on maybe allowing a constructor for an already constructed acceptor
 	virtual ~ReceiverTcp() = default;
 	
+	//! Sets the underlying socketErrorHandler based on the asio::io::tcp protocol.
 	void setSocketErrorHandler( SocketErrorHandler<protocol> errorHandler );
 	
 protected:
@@ -579,7 +583,6 @@ protected:
 	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
 	
-	asio::io_service				&mIoService;
 	asio::ip::tcp::acceptor			mAcceptor;
 	asio::ip::tcp::endpoint			mLocalEndpoint;
 	

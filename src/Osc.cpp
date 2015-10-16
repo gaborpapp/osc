@@ -146,6 +146,13 @@ Argument& Argument::operator=( Argument &&arg ) noexcept
 	}
 	return *this;
 }
+	
+bool Argument::operator==(const Argument &arg ) const
+{
+	return mType == arg.mType &&
+			mOffset == arg.mOffset &&
+			mSize == arg.mSize;
+}
 
 ArgType Argument::translateCharToArgType( char type )
 {
@@ -287,7 +294,7 @@ void Message::appendBlob( void* blob, uint32_t size )
 	mIsCached = false;
 	auto trailingZeros = getTrailingZeros( size );
 	auto totalBufferSize = 4 + size + trailingZeros;
-	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), totalBufferSize, true );
+	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), size, true );
 	appendDataBuffer( &size, sizeof(uint32_t) );
 	appendDataBuffer( blob, size, trailingZeros );
 }
@@ -426,6 +433,31 @@ const Argument& Message::operator[]( uint32_t index ) const
 		throw ExcIndexOutOfBounds( mAddress, index );
 	
 	return mDataViews[index];
+}
+	
+bool Message::operator==( const Message &message ) const
+{
+	auto sameAddress = message.mAddress == mAddress;
+	if( ! sameAddress ) return false;
+	
+	auto sameDataViewSize = message.mDataViews.size() == mDataViews.size();
+	if( ! sameDataViewSize ) return false;
+	for( int i = 0; i < mDataViews.size(); i++ ) {
+		auto sameDataView = message.mDataViews[i] == mDataViews[i];
+		if( ! sameDataView ) return false;
+	}
+	
+	auto sameDataBufferSize = mDataBuffer.size() == message.mDataBuffer.size();
+	if( ! sameDataBufferSize ) return false;
+	auto sameDataBuffer = ! memcmp( mDataBuffer.data(), message.mDataBuffer.data(), mDataBuffer.size() );
+	if( ! sameDataBuffer ) return false;
+	
+	return true;
+}
+
+bool Message::operator!=( const Message &message ) const
+{
+	return ! (*this == message);
 }
 
 int32_t	Argument::int32() const
@@ -662,11 +694,11 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				remain -= 4;
 				int32 = htonl( int32 );
 				if( int32 > remain ) return false;
+				auto trailingZeros = getTrailingZeros( int32 );
 				dataView.mSize = int32;
 				dataView.mOffset = getCurrentOffset();
-				auto trailingZeros = getTrailingZeros( dataView.mSize );
 				appendDataBuffer( &dataView.mSize, sizeof( uint32_t ) );
-				appendDataBuffer( head, dataView.mSize, trailingZeros );
+				appendDataBuffer( head, int32, trailingZeros );
 				head += int32 + trailingZeros;
 				remain -= int32 + trailingZeros;
 			}
@@ -676,7 +708,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 				tail = head;
 				i = 0;
 				while( tail[i] != '\0' && ++i < remain );
-				dataView.mSize = i;
+				dataView.mSize = i + getTrailingZeros( i );
 				dataView.mOffset = getCurrentOffset();
 				appendDataBuffer( head, i, getTrailingZeros( i ) );
 				i += getTrailingZeros( i );
@@ -689,7 +721,7 @@ bool Message::bufferCache( uint8_t *data, size_t size )
 			case 't': {
 				memcpy( &int64, head, sizeof( uint64_t ) );
 				int64 = htonll( int64 );
-				dataView.mSize = i;
+				dataView.mSize = sizeof( uint64_t );
 				dataView.mOffset = getCurrentOffset();
 				appendDataBuffer( &int64, sizeof( uint64_t ) );
 				head += sizeof( uint64_t );
@@ -1237,12 +1269,12 @@ void ReceiverTcp::Connection::read()
 }
 
 ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
-: mIoService( service ), mAcceptor( mIoService ), mLocalEndpoint( protocol, port )
+	: mAcceptor( service ), mLocalEndpoint( protocol, port )
 {
 }
 
 ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service )
-: mIoService( service ), mAcceptor( mIoService ), mLocalEndpoint( localEndpoint )
+: mAcceptor( service ), mLocalEndpoint( localEndpoint )
 {
 }
 	
@@ -1260,7 +1292,9 @@ void ReceiverTcp::setSocketErrorHandler( SocketErrorHandler<protocol> errorHandl
 
 void ReceiverTcp::listenImpl()
 {
-	auto socket = TcpSocketRef( new tcp::socket( mIoService ) );
+	auto socket = TcpSocketRef( new tcp::socket( mAcceptor.get_io_service() ) );
+	
+	mAcceptor.listen();
 	
 	mAcceptor.async_accept( *socket, std::bind(
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
