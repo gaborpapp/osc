@@ -71,9 +71,6 @@ using namespace std::placeholders;
 
 namespace osc {
 	
-static int64_t sTimeOffsetSecs = 0;
-static int64_t sTimeOffsetUsecs = 0;
-	
 /// Convert 32-bit float to a big-endian network format
 inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
 /// Convert 64-bit float (double) to a big-endian network format

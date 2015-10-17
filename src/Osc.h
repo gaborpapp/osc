@@ -245,11 +245,7 @@ public:
 	
 private:
 	//! Helper to calculate how many zeros to buffer to create a 4 byte
-	static uint8_t getTrailingZeros( size_t bufferSize )
-	{
-		auto mod4ByteAlignment = bufferSize % 4;
-		return mod4ByteAlignment == 0 ? 0 : 4 - mod4ByteAlignment;
-	}
+	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
 	//! Helper to get current offset into the buffer.
 	size_t getCurrentOffset() { return mDataBuffer.size(); }
 	

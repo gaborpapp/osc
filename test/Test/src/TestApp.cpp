@@ -24,12 +24,10 @@ class TestApp : public App {
 	
 #if defined TEST_UDP
 	void sendMessageUdp( const osc::Message &message );
-	
 	osc::ReceiverUdp	mReceiver;
 	osc::SenderUdp		mSender;
 #else
 	void sendMessageTcp( const osc::Message &message );
-	
 	osc::ReceiverTcp	mReceiver;
 	osc::SenderTcp		mSender;
 #endif
@@ -44,80 +42,79 @@ TestApp::TestApp()
 	mReceiver.bind();
 	mReceiver.listen();
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ){
-							  cout << "Integer: " << message[0].int32() << endl;
-						  } );
+	[]( const osc::Message &message ){
+		cout << "Integer: " << message[0].int32() << endl;
+	} );
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "String: " << message[1].string() << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "String: " << message[1].string() << endl;
+	});
 	mReceiver.setListener( "/app/*",
-						  []( const osc::Message &message ) {
-							  auto blob0 = message[2].blob();
-							  TestStruct myStruct0( *reinterpret_cast<TestStruct*>( blob0.getData() ) );
-							  cout << "Test Struct 0: " <<  endl <<
-								"\tint: " << myStruct0.myInt << endl <<
-								"\tfloat: " << myStruct0.myFloat << endl <<
-								"\tdouble: " << myStruct0.myDouble << endl;
-							  auto blob1 = message.getArgBlob( 3 );
-							  TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
-							  cout << "Test Struct 1: " <<  endl <<
-							  "\tint: " << myStruct1.myInt << endl <<
-							  "\tfloat: " << myStruct1.myFloat << endl <<
-							  "\tdouble: " << myStruct1.myDouble << endl;
-						  });
+	[]( const osc::Message &message ) {
+		auto blob0 = message[2].blob();
+		TestStruct myStruct0( *reinterpret_cast<TestStruct*>( blob0.getData() ) );
+		cout << "Test Struct 0: " <<  endl <<
+		"\tint: " << myStruct0.myInt << endl <<
+		"\tfloat: " << myStruct0.myFloat << endl <<
+		"\tdouble: " << myStruct0.myDouble << endl;
+		auto blob1 = message.getArgBlob( 3 );
+		TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
+		cout << "Test Struct 1: " <<  endl <<
+		"\tint: " << myStruct1.myInt << endl <<
+		"\tfloat: " << myStruct1.myFloat << endl <<
+		"\tdouble: " << myStruct1.myDouble << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Character: " << message[4].character() << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "Character: " << message[4].character() << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Midi: " << message << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "Midi: " << message << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Int64: " << message[6].int64() << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "Int64: " << message[6].int64() << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Float: " << message[7].flt() << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "Float: " << message[7].flt() << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Double: " << message[8].dbl() << endl;
-						  });
-	
+	[]( const osc::Message &message ) {
+		cout << "Double: " << message[8].dbl() << endl;
+	});
 	mReceiver.setListener( "/app/?",
-						  []( const osc::Message &message ) {
-							  cout << "Boolean: " << message[9].boolean() << endl;
-						  });
+	[]( const osc::Message &message ) {
+		cout << "Boolean: " << message[9].boolean() << endl;
+	});
 	mReceiver.setListener( "/app/10",
 	[&]( const osc::Message &message ) {
-		  cout << "Address: " << message.getAddress() << endl;
-		  cout << "Integer: " << message[0].int32() << endl;
-		  cout << "String: " << message[1].string() << endl;
-		  auto blob0 = message[2].blob();
-		  TestStruct myStruct0( *reinterpret_cast<TestStruct*>( blob0.getData() ) );
-		  cout << "Test Struct 0: " <<  endl <<
-		  "\tint: " << myStruct0.myInt << endl <<
-		  "\tfloat: " << myStruct0.myFloat << endl <<
-		  "\tdouble: " << myStruct0.myDouble << endl;
-		  auto blob1 = message.getArgBlob( 3 );
-		  TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
-		  cout << "Test Struct 1: " <<  endl <<
-		  "\tint: " << myStruct1.myInt << endl <<
-		  "\tfloat: " << myStruct1.myFloat << endl <<
-		  "\tdouble: " << myStruct1.myDouble << endl;
-		  cout << "Character: " << message[4].character() << endl;
-		  osc::ByteArray<4> midi;
-		  message[5].midi( &midi[0], &midi[1], &midi[2], &midi[3] );
-		  cout << "Midi: " <<  (int)midi[0] << " " <<  (int)midi[1] << " " <<  (int)midi[2] << " " <<  (int)midi[3] << endl;
-		  cout << "Int64: " << message[6].int64() << endl;
-		  cout << "Float: " << message[7].flt() << endl;
-		  cout << "Double: " << message[8].dbl() << endl;
-		  cout << "Boolean: " << message[9].boolean() << endl;
-		  auto messagesTheSame = (mMessage == message);
-		  cout << "Messages are the same: " << (messagesTheSame ? "true" : "false") << endl;
+		cout << "Address: " << message.getAddress() << endl;
+		cout << "Integer: " << message[0].int32() << endl;
+		cout << "String: " << message[1].string() << endl;
+		auto blob0 = message[2].blob();
+		TestStruct myStruct0( *reinterpret_cast<TestStruct*>( blob0.getData() ) );
+		cout << "Test Struct 0: " <<  endl <<
+		"\tint: " << myStruct0.myInt << endl <<
+		"\tfloat: " << myStruct0.myFloat << endl <<
+		"\tdouble: " << myStruct0.myDouble << endl;
+		auto blob1 = message.getArgBlob( 3 );
+		TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
+		cout << "Test Struct 1: " <<  endl <<
+		"\tint: " << myStruct1.myInt << endl <<
+		"\tfloat: " << myStruct1.myFloat << endl <<
+		"\tdouble: " << myStruct1.myDouble << endl;
+		cout << "Character: " << message[4].character() << endl;
+		osc::ByteArray<4> midi;
+		message[5].midi( &midi[0], &midi[1], &midi[2], &midi[3] );
+		cout << "Midi: " <<  (int)midi[0] << " " <<  (int)midi[1] << " " <<  (int)midi[2] << " " <<  (int)midi[3] << endl;
+		cout << "Int64: " << message[6].int64() << endl;
+		cout << "Float: " << message[7].flt() << endl;
+		cout << "Double: " << message[8].dbl() << endl;
+		cout << "Boolean: " << message[9].boolean() << endl;
+		auto messagesTheSame = (mMessage == message);
+		cout << "Messages are the same: " << (messagesTheSame ? "true" : "false") << endl;
 	});
 }
 
@@ -165,7 +162,7 @@ void TestApp::update()
 		sendMessageTcp( message );
 #endif
 		mMessage = std::move( message );
-		cout << mMessage << endl;
+//		cout << mMessage << endl;
 	}
 }
 
