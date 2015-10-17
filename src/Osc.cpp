@@ -369,7 +369,7 @@ void Message::createCache() const
 	typesArray[0] = ',';
 	int i = 1;
 	for( auto & dataView : mDataViews ) {
-		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getArgType() );
+		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getType() );
 		if( dataView.needsEndianSwapForTransmit() )
 			dataView.swapEndianForTransmit( reinterpret_cast<uint8_t*>( dataArray.data() ) );
 	}
@@ -452,7 +452,7 @@ bool Message::operator!=( const Message &message ) const
 int32_t	Argument::int32() const
 {
 	if( ! convertible<int32_t>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_32, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_32, getType() );
 	
 	return *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);;
 }
@@ -460,7 +460,7 @@ int32_t	Argument::int32() const
 int64_t	Argument::int64() const
 {
 	if( ! convertible<int64_t>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_64, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::INTEGER_64, getType() );
 	
 	return *reinterpret_cast<const int64_t*>(&mOwner->mDataBuffer[getOffset()]);;
 }
@@ -468,7 +468,7 @@ int64_t	Argument::int64() const
 float Argument::flt() const
 {
 	if( ! convertible<float>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::FLOAT, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::FLOAT, getType() );
 	
 	return *reinterpret_cast<const float*>(&mOwner->mDataBuffer[getOffset()]);;
 }
@@ -476,7 +476,7 @@ float Argument::flt() const
 double Argument::dbl() const
 {
 	if( ! convertible<double>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::DOUBLE, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::DOUBLE, getType() );
 	
 	return *reinterpret_cast<const double*>(&mOwner->mDataBuffer[getOffset()]);;
 }
@@ -484,15 +484,15 @@ double Argument::dbl() const
 bool Argument::boolean() const
 {
 	if( ! convertible<bool>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BOOL_T, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BOOL_T, getType() );
 	
-	return getArgType() == ArgType::BOOL_T;
+	return getType() == ArgType::BOOL_T;
 }
 	
 void Argument::midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
 {
 	if( ! convertible<int32_t>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::MIDI, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::MIDI, getType() );
 	
 	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);
 	*port = midiVal;
@@ -504,29 +504,29 @@ void Argument::midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *da
 ci::Buffer Argument::blob() const
 {
 	if( ! convertible<ci::Buffer>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getType() );
 	
 	// skip the first 4 bytes, as they are the size
 	const uint8_t* data = reinterpret_cast<const uint8_t*>( &mOwner->mDataBuffer[getOffset()+4] );
-	ci::Buffer ret( getArgSize() );
-	memcpy( ret.getData(), data, getArgSize() );
+	ci::Buffer ret( getSize() );
+	memcpy( ret.getData(), data, getSize() );
 	return ret;
 }
 	
 void Argument::blobData( const void **dataPtr, size_t *size ) const
 {
 	if( ! convertible<ci::Buffer>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::BLOB, getType() );
 	
 	// skip the first 4 bytes, as they are the size
 	*dataPtr = reinterpret_cast<const void*>( &mOwner->mDataBuffer[getOffset()+4] );
-	*size = getArgSize();
+	*size = getSize();
 }
 	
 char Argument::character() const
 {
 	if( ! convertible<int32_t>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::CHAR, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::CHAR, getType() );
 	
 	return mOwner->mDataBuffer[getOffset()];
 }
@@ -534,7 +534,7 @@ char Argument::character() const
 std::string Argument::string() const
 {
 	if( ! convertible<std::string>() )
-		throw ExcNonConvertible( mOwner->getAddress(), ArgType::STRING, getArgType() );
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::STRING, getType() );
 	
 	const char* head = reinterpret_cast<const char*>(&mOwner->mDataBuffer[getOffset()]);
 	return std::string( head );
@@ -568,70 +568,70 @@ ArgType Message::getArgType( uint32_t index ) const
 		throw ExcIndexOutOfBounds( mAddress, index );
 	
 	auto &dataView = mDataViews[index];
-	return dataView.getArgType();
+	return dataView.getType();
 }
 
-int32_t Message::getInt( uint32_t index ) const
+int32_t Message::getArgInt( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
 	return dataView.int32();
 }
 
-float Message::getFloat( uint32_t index ) const
+float Message::getArgFloat( uint32_t index ) const
 {
 	auto &dataView = getDataView<float>( index );
 	return dataView.flt();
 }
 
-std::string Message::getString( uint32_t index ) const
+std::string Message::getArgString( uint32_t index ) const
 {
 	auto &dataView = getDataView<std::string>( index );
 	return dataView.string();
 }
 
-int64_t Message::getTime( uint32_t index ) const
+int64_t Message::getArgTime( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
 	return dataView.int64();
 }
 
-int64_t Message::getInt64( uint32_t index ) const
+int64_t Message::getArgInt64( uint32_t index ) const
 {
 	auto &dataView = getDataView<int64_t>( index );
 	return dataView.int64();
 }
 
-double Message::getDouble( uint32_t index ) const
+double Message::getArgDouble( uint32_t index ) const
 {
 	auto &dataView = getDataView<double>( index );
 	return dataView.dbl();
 }
 
-bool Message::getBool( uint32_t index ) const
+bool Message::getArgBool( uint32_t index ) const
 {
 	auto &dataView = getDataView<bool>( index );
 	return dataView.boolean();
 }
 
-char Message::getChar( uint32_t index ) const
+char Message::getArgChar( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
 	return dataView.character();
 }
 
-void Message::getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
+void Message::getArgMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
 	dataView.midi( port, status, data1, data2 );
 }
 
-ci::Buffer Message::getBlob( uint32_t index ) const
+ci::Buffer Message::getArgBlob( uint32_t index ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
 	return dataView.blob();
 }
 	
-void Message::getBlobData( uint32_t index, const void **dataPtr, size_t *size ) const
+void Message::getArgBlobData( uint32_t index, const void **dataPtr, size_t *size ) const
 {
 	auto &dataView = getDataView<ci::Buffer>( index );
 	dataView.blobData( dataPtr, size );
@@ -791,7 +791,7 @@ std::ostream& operator<<( std::ostream &os, const Message &rhs )
 {
 	os << "Address: " << rhs.getAddress() << std::endl;
 	for( auto &dataView : rhs.mDataViews ) {
-		os << "\t<" << argTypeToString( dataView.getArgType() ) << ">: ";
+		os << "\t<" << argTypeToString( dataView.getType() ) << ">: ";
 		dataView.outputValueToStream( os );
 		os << std::endl;
 	}

@@ -59,7 +59,7 @@ TestApp::TestApp()
 								"\tint: " << myStruct0.myInt << endl <<
 								"\tfloat: " << myStruct0.myFloat << endl <<
 								"\tdouble: " << myStruct0.myDouble << endl;
-							  auto blob1 = message.getBlob( 3 );
+							  auto blob1 = message.getArgBlob( 3 );
 							  TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
 							  cout << "Test Struct 1: " <<  endl <<
 							  "\tint: " << myStruct1.myInt << endl <<
@@ -102,7 +102,7 @@ TestApp::TestApp()
 		  "\tint: " << myStruct0.myInt << endl <<
 		  "\tfloat: " << myStruct0.myFloat << endl <<
 		  "\tdouble: " << myStruct0.myDouble << endl;
-		  auto blob1 = message.getBlob( 3 );
+		  auto blob1 = message.getArgBlob( 3 );
 		  TestStruct myStruct1( *reinterpret_cast<TestStruct*>( blob1.getData() ) );
 		  cout << "Test Struct 1: " <<  endl <<
 		  "\tint: " << myStruct1.myInt << endl <<

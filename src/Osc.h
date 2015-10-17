@@ -107,28 +107,41 @@ public:
 	// TODO: figure out if array is useful.
 	// void appendArray( void* array, size_t size );
 	
-	//! Returns the int32_t located at \a index.
-	int32_t		getInt( uint32_t index ) const;
-	//! Returns the float located at \a index.
-	float		getFloat( uint32_t index ) const;
-	//! Returns the string located at \a index.
-	std::string getString( uint32_t index ) const;
-	//! Returns the time_tag located at \a index.
-	int64_t		getTime( uint32_t index ) const;
-	//! Returns the time_tag located at \a index.
-	int64_t		getInt64( uint32_t index ) const;
-	//! Returns the double located at \a index.
-	double		getDouble( uint32_t index ) const;
-	//! Returns the bool located at \a index.
-	bool		getBool( uint32_t index ) const;
-	//! Returns the char located at \a index.
-	char		getChar( uint32_t index ) const;
-	
-	void		getMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
-	//! Returns the blob, as a ci::Buffer, located at \a index.
-	ci::Buffer	getBlob( uint32_t index ) const;
-	//!
-	void getBlobData( uint32_t index, const void **dataPtr, size_t *size ) const;
+	//! Returns the int32_t located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	int32_t		getArgInt( uint32_t index ) const;
+	//! Returns the float located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	float		getArgFloat( uint32_t index ) const;
+	//! Returns the string located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	std::string getArgString( uint32_t index ) const;
+	//! Returns the time_tag located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	int64_t		getArgTime( uint32_t index ) const;
+	//! Returns the time_tag located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	int64_t		getArgInt64( uint32_t index ) const;
+	//! Returns the double located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	double		getArgDouble( uint32_t index ) const;
+	//! Returns the bool located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	bool		getArgBool( uint32_t index ) const;
+	//! Returns the char located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
+	char		getArgChar( uint32_t index ) const;
+	//! Supplies values for the four arguments in the midi format located at \a index. If index is out
+	//! of bounds, throws ExcIndexOutOfBounds. If argument isn't convertible to this type, throws
+	//! ExcNonConvertible
+	void		getArgMidi( uint32_t index, uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
+	//! Returns the blob, as a ci::Buffer, located at \a index. If index is out of bounds, throws
+	//! ExcIndexOutOfBounds. If argument isn't convertible to this type, throws ExcNonConvertible
+	ci::Buffer	getArgBlob( uint32_t index ) const;
+	//! Supplies the blob data located at \a index to the \a dataPtr and \a size. Note: Doesn't copy.
+	//! If index is out of bounds, throws ExcIndexOutOfBounds. If argument isn't convertible to this type,
+	//! throws ExcNonConvertible
+	void getArgBlobData( uint32_t index, const void **dataPtr, size_t *size ) const;
 	
 	//! Returns the argument type located at \a index.
 	ArgType		getArgType( uint32_t index ) const;
@@ -156,36 +169,42 @@ public:
 		~Argument() = default;
 		
 		//! Returns the arguments type as an ArgType
-		ArgType		getArgType() const { return mType; }
+		ArgType		getType() const { return mType; }
 		//! Returns the arguments size, without trailing zeros or size int's taken into account.
-		uint32_t	getArgSize() const { return mSize; }
+		uint32_t	getSize() const { return mSize; }
 		//! Returns the offset into the dataBuffer, where this Argument starts.
 		int32_t		getOffset() const { return mOffset; }
 		
-		//! Helper function to translate from ArgType to the spec's representation of that type.
-		static char translateArgTypeToChar( ArgType type );
-		//! Helper function to translate from the spec's character representation to the ArgType.
-		static ArgType translateCharToArgType( char type );
-		
-		//! returns the underlying argument as an int32.
+		//! returns the underlying argument as an int32. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		int32_t		int32() const;
-		//! returns the underlying argument as an int64.
+		//! returns the underlying argument as an int64. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		int64_t		int64() const;
-		//! returns the underlying argument as a float.
+		//! returns the underlying argument as a float. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		float		flt() const;
-		//! returns the underlying argument as a double.
+		//! returns the underlying argument as a double. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		double		dbl() const;
-		//! returns the underlying argument as a boolean.
+		//! returns the underlying argument as a boolean. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		bool		boolean() const;
-		//!
+		//! Supplies values for the four arguments in the midi format located at \a index. If argument
+		//! isn't convertible to this type, throws ExcNonConvertible.
+		//! ExcNonConvertible
 		void		midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *data2 ) const;
-		//! Returns the underlying argument as a "deep-copied" buffer.
+		//! Returns the underlying argument as a "deep-copied" ci::Buffer. If argument isn't convertible
+		//! to this type, throws ExcNonConvertible
 		ci::Buffer	blob() const;
-		//!
+		//! Supplies the blob data located at \a index to the \a dataPtr and \a size. Note: Doesn't copy.
+		//! If argument isn't convertible to this type, throws ExcNonConvertible
 		void		blobData( const void **dataPtr, size_t *size ) const;
-		//! Returns the underlying argument as a char
+		//! Returns the underlying argument as a char. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		char		character() const;
-		//! Returns the underlying argument as a string.
+		//! Returns the underlying argument as a string. If argument isn't convertible to this type,
+		//! throws ExcNonConvertible
 		std::string string() const;
 		
 		//! Evaluates the equality of this with \a other
@@ -202,6 +221,10 @@ public:
 		//! type \a T.
 		template<typename T>
 		bool convertible() const;
+		//! Helper function to translate from ArgType to the spec's representation of that type.
+		static char translateArgTypeToChar( ArgType type );
+		//! Helper function to translate from the spec's character representation to the ArgType.
+		static ArgType translateCharToArgType( char type );
 		
 		Message*		mOwner;
 		ArgType			mType;
@@ -212,7 +235,8 @@ public:
 		friend class Message;
 		friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	};
-	//! Operator bracket returning an const Argument reference based on \a index.
+	//! Operator bracket returning an const Argument reference based on \a index. If index is out of
+	//! bounds, throws ExcIndexOutOfBounds.
 	const Argument& operator[]( uint32_t index ) const;
 	//! Evaluates the equality of this with \a other
 	bool			operator==( const Message &other ) const;
@@ -303,7 +327,7 @@ private:
 	friend class SenderUdp;
 };
 
-//! SenderBase represents an OSC Sender(client in OSC terms) and implements a unified
+//! SenderBase represents an OSC Sender (called a \a server in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class SenderBase {
 public:
@@ -349,25 +373,24 @@ class SenderUdp : public SenderBase {
 public:
 	//! Alias protocol for cleaner interfaces
 	using protocol = asio::ip::udp;
-	//! Constructs a Sender (server in OSC terms) using udp as transport, whose local endpoint is
-	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is
-	//! defined by \a destinationHost and \a destinationPort. Takes an optional io_service to
-	//! construct the socket from.
+	//! Constructs a Sender (called a \a server in the OSC spec) using udp as transport, whose local endpoint is
+	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by
+	//! \a destinationHost and \a destinationPort. Takes an optional io_service to construct the socket from.
 	SenderUdp( uint16_t localPort,
 			   const std::string &destinationHost,
 			   uint16_t destinationPort,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (server in OSC terms) whose local endpoint is defined by \a localPort
-	//! and \a protocol, which defaults to v4, and remote endpoint is defined by \a destination.
+	//! Constructs a Sender (called a \a server in the OSC spec) whose local endpoint is defined by \a
+	//! localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a destination.
 	//! Takes an optional io_service to construct the socket from.
 	SenderUdp( uint16_t localPort,
 			   const protocol::endpoint &destination,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (server in OSC terms) with an already created udp::socket shared_ptr \a socket
-	//! and remote endpoint \a destination. This constructor is good for using already constructed sockets
-	//! for more indepth configuration. Expects the local endpoint to be constructed.
+	//! Constructs a Sender (called a \a server in the OSC spec) with an already created udp::socket shared_ptr
+	//! \a socket and remote endpoint \a destination. This constructor is good for using already constructed
+	//! sockets for more indepth configuration. Expects the local endpoint to be constructed.
 	SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination );
 	//! Default virtual constructor
 	virtual ~SenderUdp() = default;
@@ -406,25 +429,24 @@ public:
 class SenderTcp : public SenderBase {
 public:
 	using protocol = asio::ip::tcp;
-	//! Constructs a Sender (server in OSC terms) using tcp as transport, whose local endpoint is
-	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is
-	//! defined by \a destinationHost and \a destinationPort. Takes an optional io_service to
-	//! construct the socket from.
+	//! Constructs a Sender (called a \a server in the OSC spec) using tcp as transport, whose local endpoint is
+	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
+	//! destinationHost and \a destinationPort. Takes an optional io_service to construct the socket from.
 	SenderTcp( uint16_t localPort,
 			   const std::string &destinationHost,
 			   uint16_t destinationPort,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (server in OSC terms) using tcp as transport, whose local endpoint is
-	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is
-	//! defined by \a destination. Takes an optional io_service to construct the socket from.
+	//! Constructs a Sender (called a \a server in the OSC spec) using tcp as transport, whose local endpoint is
+	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
+	//! destination. Takes an optional io_service to construct the socket from.
 	SenderTcp( uint16_t localPort,
 			   const protocol::endpoint &destination,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (server in OSC terms) with an already created tcp::socket shared_ptr \a socket
-	//! and remote endpoint \a destination. This constructor is good for using already constructed sockets
-	//! for more indepth configuration. Expects the local endpoint is already constructed.
+	//! Constructs a Sender (called a \a server in the OSC spec) with an already created tcp::socket shared_ptr
+	//! \a socket and remote endpoint \a destination. This constructor is good for using already constructed
+	//! sockets for more indepth configuration. Expects the local endpoint is already constructed.
 	SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination );
 	virtual ~SenderTcp() = default;
 	
@@ -458,7 +480,7 @@ public:
 	SenderTcp& operator=( SenderTcp &&other ) = delete;
 };
 
-//! ReceiverBase represents an OSC Receiver(server in OSC terms) and implements a unified
+//! ReceiverBase represents an OSC Receiver(called a \a client in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class ReceiverBase {
 public:
@@ -517,24 +539,24 @@ protected:
 	std::mutex				mListenerMutex, mSocketTransportErrorFnMutex;
 };
 	
-//! ReceiverUdp represents an OSC Receiver(server in OSC terms) and implements the udp transport
+//! ReceiverUdp represents an OSC Receiver(called a \a client in the OSC spec) and implements the udp transport
 //!	networking layer.
 class ReceiverUdp : public ReceiverBase {
 public:
 	using protocol = asio::ip::udp;
-	//! Constructs a Receiver (client in OSC terms) using udp for transport, whose local endpoint is
-	//! defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service
-	//! to construct the socket from.
+	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, whose local endpoint
+	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
+	//! construct the socket from.
 	ReceiverUdp( uint16_t port,
 				 const protocol &protocol = protocol::v4(),
 				 asio::io_service &io = ci::app::App::get()->io_service()  );
-	//! Constructs a Receiver (client in OSC terms) using udp for transport, whose local endpoint is
-	//! defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
+	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, whose local endpoint
+	//! is defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
 	ReceiverUdp( const protocol::endpoint &localEndpoint,
 				 asio::io_service &io = ci::app::App::get()->io_service() );
-	//! Constructs a Receiver (client in OSC terms) using udp for transport, from the already constructed
-	//! udp::socket shared_ptr \a socket. Use this for extra configuration and or sharing sockets between
-	//! sender and receiver.
+	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, from the already
+	//! constructed udp::socket shared_ptr \a socket. Use this for extra configuration and or sharing sockets
+	//! between sender and receiver.
 	ReceiverUdp( UdpSocketRef socket );
 	
 	virtual ~ReceiverUdp() = default;
@@ -573,23 +595,23 @@ public:
 	ReceiverUdp& operator=( ReceiverUdp &&other ) = delete;
 };
 
-//! ReceiverTcp represents an OSC Receiver(server in OSC terms) and implements the tcp transport
-//!	networking layer.
+//! ReceiverTcp represents an OSC Receiver(called a \a client in the OSC spec) and implements the tcp
+//! transport networking layer.
 class ReceiverTcp : public ReceiverBase {
 public:
 	using protocol = asio::ip::tcp;
-	//! Constructs a Receiver (client in OSC terms) using tcp for transport, whose local endpoint is
-	//! defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service
-	//! to construct the socket from.
+	//! Constructs a Receiver (called a \a client in the OSC spec) using tcp for transport, whose local endpoint
+	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
+	//! construct the socket from.
 	ReceiverTcp( uint16_t port,
-			 const protocol &protocol = protocol::v4(),
-			 asio::io_service &service = ci::app::App::get()->io_service()  );
-	//! Constructs a Receiver (client in OSC terms) using tcp for transport, whose local endpoint is
-	//! defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
+				 const protocol &protocol = protocol::v4(),
+				 asio::io_service &service = ci::app::App::get()->io_service()  );
+	//! Constructs a Receiver (called a \a client in the OSC spec) using tcp for transport, whose local endpoint
+	//! is defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
 	ReceiverTcp( const protocol::endpoint &localEndpoint,
-			 asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Receiver (client in OSC terms) using udp for transport, from the already constructed
-	//! udp::socket shared_ptr \a socket. Use this for extra configuration.
+				 asio::io_service &service = ci::app::App::get()->io_service() );
+	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, from the already
+	//! constructed udp::socket shared_ptr \a socket. Use this for extra configuration.
 	ReceiverTcp( AcceptorRef acceptor );
 	virtual ~ReceiverTcp() = default;
 	
