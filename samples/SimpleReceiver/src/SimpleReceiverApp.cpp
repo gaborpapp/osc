@@ -6,7 +6,7 @@
 #include "cinder/Timeline.h"
 #include "Osc.h"
 
-#define USE_UDP 0
+#define USE_UDP 1
 
 using namespace ci;
 using namespace ci::app;

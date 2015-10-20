@@ -20,6 +20,7 @@ public:
 	SimpleMultiThreadedSenderApp();
 	void setup() override;
 	void mouseDown( MouseEvent event ) override;
+	void mouseDrag( MouseEvent event ) override;
 	void mouseUp( MouseEvent event ) override;
 	void mouseMove( MouseEvent event ) override;
 	void draw() override;
@@ -73,6 +74,11 @@ void SimpleMultiThreadedSenderApp::mouseDown( MouseEvent event )
 	msg.append( (float)event.getPos().y / getWindowHeight() );
 	
 	mSender.send( msg );
+}
+
+void SimpleMultiThreadedSenderApp::mouseDrag( MouseEvent event )
+{
+	mouseMove( event );
 }
 
 void SimpleMultiThreadedSenderApp::mouseUp( MouseEvent event )

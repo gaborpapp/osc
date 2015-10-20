@@ -4,7 +4,7 @@
 
 #include "Osc.h"
 
-#define USE_UDP 0
+#define USE_UDP 1
 
 using namespace ci;
 using namespace ci::app;
@@ -18,6 +18,7 @@ class SimpleSenderApp : public App {
 	SimpleSenderApp();
 	void setup() override;
 	void mouseDown( MouseEvent event ) override;
+	void mouseDrag( MouseEvent event ) override;
 	void mouseUp( MouseEvent event ) override;
 	void mouseMove( MouseEvent event ) override;
 	void draw() override;
@@ -61,6 +62,11 @@ void SimpleSenderApp::mouseDown( MouseEvent event )
 	msg.append( (float)event.getPos().y / getWindowHeight() );
 	
 	mSender.send( msg );
+}
+
+void SimpleSenderApp::mouseDrag( MouseEvent event )
+{
+	mouseMove( event );
 }
 
 void SimpleSenderApp::mouseUp( MouseEvent event )
