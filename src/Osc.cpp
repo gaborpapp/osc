@@ -37,8 +37,6 @@
 #include "cinder/Log.h"
 
 using namespace std;
-using namespace ci;
-using namespace ci::app;
 using namespace asio;
 using namespace asio::ip;
 using namespace std::placeholders;
