@@ -10,7 +10,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{CCA46A44-4212-4E77-A930-D58F8CD64B76}</ProjectGuid>
+    <ProjectGuid>{51754534-1C87-4A14-A8F8-958D54896337}</ProjectGuid>
     <RootNamespace>SimpleSender</RootNamespace>
     <Keyword>Win32Proj</Keyword>
   </PropertyGroup>

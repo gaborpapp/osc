@@ -34,8 +34,19 @@
 /// include code to actually send or receive OSC messages.
 
 #pragma once
-
+#define ASIO_STANDALONE
 #include "asio/asio.hpp"
+
+#include <mutex>
+
+#include "cinder/Buffer.h"
+#include "cinder/app/App.h"
+
+#if ! defined( _MSC_VER ) || _MSC_VER >= 1900
+#define NOEXCEPT noexcept
+#else 
+#define NOEXCEPT
+#endif
 
 namespace osc {
 	
@@ -64,8 +75,8 @@ public:
 	explicit Message( const std::string& address );
 	Message( const Message & ) = delete;
 	Message& operator=( const Message & ) = delete;
-	Message( Message && ) noexcept;
-	Message& operator=( Message && ) noexcept;
+	Message( Message && ) NOEXCEPT;
+	Message& operator=( Message && ) NOEXCEPT;
 	~Message() = default;
 	
 	// Functions for appending OSC 1.0 types
@@ -163,8 +174,8 @@ public:
 		Argument( Message *owner, ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
 		Argument( const Argument &arg ) = delete;
 		Argument& operator=( const Argument &arg ) = delete;
-		Argument( Argument &&arg ) noexcept;
-		Argument& operator=( Argument &&arg ) noexcept;
+		Argument( Argument &&arg ) NOEXCEPT;
+		Argument& operator=( Argument &&arg ) NOEXCEPT;
 		
 		~Argument() = default;
 		
@@ -668,7 +679,7 @@ protected:
 	using UniqueConnection = std::unique_ptr<Connection>;
 	std::vector<UniqueConnection>			mConnections;
 
-	friend class Connection;
+	friend struct Connection;
 public:
 	//! Non-copyable.
 	ReceiverTcp( const ReceiverTcp &other ) = delete;

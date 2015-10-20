@@ -13,13 +13,13 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
     <Filter Include="Blocks">
-      <UniqueIdentifier>{4022850A-99AA-420D-9C65-FB20226F7FDB}</UniqueIdentifier>
+      <UniqueIdentifier>{C1760265-FBFF-4EF3-8DF0-592C46C636D5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Blocks\newosc">
-      <UniqueIdentifier>{9D48B84A-8315-4660-A0BD-346254D675DE}</UniqueIdentifier>
+      <UniqueIdentifier>{DA31EFEC-A529-4B8E-B15E-4DEE864B0C93}</UniqueIdentifier>
     </Filter>
     <Filter Include="Blocks\newosc\src">
-      <UniqueIdentifier>{268CC3E1-3DC2-470F-BC3B-267C803F5BB5}</UniqueIdentifier>
+      <UniqueIdentifier>{0C9E67EB-8BAA-4467-B689-C2F32A8C0B76}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

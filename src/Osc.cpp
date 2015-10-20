@@ -86,7 +86,7 @@ Message::Message( const std::string& address )
 {
 }
 	
-Message::Message( Message &&message ) noexcept
+Message::Message( Message &&message ) NOEXCEPT
 : mAddress( move( message.mAddress ) ), mDataBuffer( move( message.mDataBuffer ) ),
 	mDataViews( move( message.mDataViews ) ), mIsCached( message.mIsCached ),
 	mCache( move( message.mCache ) )
@@ -96,7 +96,7 @@ Message::Message( Message &&message ) noexcept
 	}
 }
 
-Message& Message::operator=( Message &&message ) noexcept
+Message& Message::operator=( Message &&message ) NOEXCEPT
 {
 	if( this != &message ) {
 		mAddress = move( message.mAddress );
@@ -124,13 +124,13 @@ Argument::Argument( Message *owner, ArgType type, int32_t offset, uint32_t size,
 {
 }
 	
-Argument::Argument( Argument &&arg ) noexcept
+Argument::Argument( Argument &&arg ) NOEXCEPT
 : mOwner( arg.mOwner ), mType( arg.mType ), mOffset( arg.mOffset ),
 	mSize( arg.mSize ), mNeedsEndianSwapForTransmit( arg.mNeedsEndianSwapForTransmit )
 {
 }
 	
-Argument& Argument::operator=( Argument &&arg ) noexcept
+Argument& Argument::operator=( Argument &&arg ) NOEXCEPT
 {
 	if( this != &arg ) {
 		mOwner = arg.mOwner;
@@ -942,7 +942,7 @@ void SenderTcp::bindImpl()
 void SenderTcp::connect()
 {
 	mSocket->async_connect( mRemoteEndpoint,
-	[&]( const error_code &error ){
+	[&]( const asio::error_code &error ){
 		if( error )
 			CI_LOG_E( error.message() );
 	});
@@ -1189,7 +1189,7 @@ void ReceiverUdp::listenImpl()
 	auto tempBuffer = mBuffer.prepare( mAmountToReceive );
 	auto uniqueEndpoint = std::make_shared<asio::ip::udp::endpoint>();
 	mSocket->async_receive_from( tempBuffer, *uniqueEndpoint,
-	[&, uniqueEndpoint]( const error_code &error, size_t bytesTransferred ) {
+	[&, uniqueEndpoint]( const asio::error_code &error, size_t bytesTransferred ) {
 		if( error ) {
 			std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
 			if( mSocketTransportErrorFn ) {

@@ -4,7 +4,7 @@
 
 #include "Osc.h"
 
-#define USE_UDP 1
+#define USE_UDP 0
 
 using namespace ci;
 using namespace ci::app;
@@ -79,4 +79,7 @@ void SimpleSenderApp::draw()
 	gl::drawSolidCircle( mCurrentMousePositon, 100 );
 }
 
-CINDER_APP( SimpleSenderApp, RendererGl )
+CINDER_APP( SimpleSenderApp, RendererGl, []( App::Settings *settings ) {
+	settings->setConsoleWindowEnabled();
+	settings->setMultiTouchEnabled( false );
+})

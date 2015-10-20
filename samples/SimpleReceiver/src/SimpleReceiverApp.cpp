@@ -6,7 +6,7 @@
 #include "cinder/Timeline.h"
 #include "Osc.h"
 
-#define USE_UDP 1
+#define USE_UDP 0
 
 using namespace ci;
 using namespace ci::app;
@@ -61,4 +61,7 @@ void SimpleReceiverApp::draw()
 	
 }
 
-CINDER_APP( SimpleReceiverApp, RendererGl )
+CINDER_APP( SimpleReceiverApp, RendererGl, []( App::Settings *settings ) {
+	settings->setConsoleWindowEnabled();
+	settings->setMultiTouchEnabled( false );
+})

@@ -18,6 +18,7 @@ public:
 	void setup() override;
 	void update() override;
 	void draw() override;
+	void cleanup() override;
 	
 	std::shared_ptr<asio::io_service>		mIoService;
 	std::shared_ptr<asio::io_service::work>	mWork;
@@ -91,7 +92,16 @@ void SimpleMultiThreadedReceiverApp::draw()
 		std::lock_guard<std::mutex> lock( mSquarePosMutex );
 		gl::drawSolidRect( Rectf( mCurrentSquarePos - vec2( 50 ), mCurrentSquarePos + vec2( 50 ) ) );
 	}
-	
 }
 
-CINDER_APP( SimpleMultiThreadedReceiverApp, RendererGl )
+void SimpleMultiThreadedReceiverApp::cleanup()
+{
+	mWork.reset();
+	mIoService->stop();
+	mThread.join();
+}
+
+CINDER_APP( SimpleMultiThreadedReceiverApp, RendererGl, []( App::Settings *settings ) {
+	settings->setConsoleWindowEnabled();
+	settings->setMultiTouchEnabled( false );
+})
