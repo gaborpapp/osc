@@ -29,7 +29,7 @@ public:
 	
 	std::shared_ptr<asio::io_service>		mIoService;
 	std::shared_ptr<asio::io_service::work>	mWork;
-	std::thread				mThread;
+	std::thread								mThread;
 	
 #if USE_UDP
 	osc::SenderUdp mSender;

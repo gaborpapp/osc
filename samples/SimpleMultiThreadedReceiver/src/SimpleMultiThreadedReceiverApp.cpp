@@ -16,15 +16,16 @@ class SimpleMultiThreadedReceiverApp : public App {
 public:
 	SimpleMultiThreadedReceiverApp();
 	void setup() override;
+	void update() override;
 	void draw() override;
-	
-	ivec2	mCurrentCirclePos;
-	vec2	mCurrentSquarePos;
-	bool	mMouseDown = false;
 	
 	std::shared_ptr<asio::io_service>		mIoService;
 	std::shared_ptr<asio::io_service::work>	mWork;
-	std::thread				mThread;
+	std::thread								mThread;
+	
+	ivec2	mCurrentCirclePos;
+	vec2	mCurrentSquarePos, mTargetSquarePos;
+	bool	mUpdatedTarget;
 	
 	std::mutex mCirclePosMutex, mSquarePosMutex;
 	
@@ -52,9 +53,10 @@ void SimpleMultiThreadedReceiverApp::setup()
 	mReceiver.setListener( "/mouseclick/1",
 	[&]( const osc::Message &msg ){
 		std::lock_guard<std::mutex> lock( mSquarePosMutex );
-		vec2 target = vec2( msg[0].flt(), msg[1].flt() ) * vec2( getWindowSize() );
-		timeline().applyPtr( &mCurrentSquarePos, target, 1.0f );
+		mTargetSquarePos = vec2( msg[0].flt(), msg[1].flt() ) * vec2( getWindowSize() );
+		mUpdatedTarget = true;
 	});
+	
 	mReceiver.bind();
 	mReceiver.listen();
 	
@@ -64,6 +66,16 @@ void SimpleMultiThreadedReceiverApp::setup()
 	}, mIoService ));
 }
 
+void SimpleMultiThreadedReceiverApp::update()
+{
+	if(	mSquarePosMutex.try_lock() ) {
+		if( mUpdatedTarget ) {
+			timeline().applyPtr( &mCurrentSquarePos, mTargetSquarePos, 1.0f );
+			mUpdatedTarget = false;
+		}
+		mSquarePosMutex.unlock();
+	}
+}
 
 void SimpleMultiThreadedReceiverApp::draw()
 {
