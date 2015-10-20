@@ -98,4 +98,9 @@ void SimpleMultiThreadedSenderApp::cleanup()
 	mThread.join();
 }
 
-CINDER_APP( SimpleMultiThreadedSenderApp, RendererGl )
+CINDER_APP( SimpleMultiThreadedSenderApp, RendererGl, []( App::Settings *settings ){
+#if defined( CINDER_MSW )
+	settings->setConsoleWindowEndabled();
+#endif
+	settings->setMultiTouchEnabled( false );
+})

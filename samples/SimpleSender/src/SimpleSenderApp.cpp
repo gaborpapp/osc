@@ -80,6 +80,8 @@ void SimpleSenderApp::draw()
 }
 
 CINDER_APP( SimpleSenderApp, RendererGl, []( App::Settings *settings ) {
+#if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
+#endif
 	settings->setMultiTouchEnabled( false );
 })

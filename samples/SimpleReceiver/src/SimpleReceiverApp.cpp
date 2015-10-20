@@ -62,6 +62,8 @@ void SimpleReceiverApp::draw()
 }
 
 CINDER_APP( SimpleReceiverApp, RendererGl, []( App::Settings *settings ) {
+#if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
+#endif
 	settings->setMultiTouchEnabled( false );
 })

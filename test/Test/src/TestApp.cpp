@@ -186,5 +186,7 @@ void TestApp::sendMessageTcp( const osc::Message &message )
 #endif
 
 CINDER_APP( TestApp, RendererGl, []( App::Settings *settings ) {
+#if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
+#endif
 })
