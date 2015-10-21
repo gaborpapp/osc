@@ -34,7 +34,9 @@
 /// include code to actually send or receive OSC messages.
 
 #pragma once
+#if ! defined( ASIO_STANDALONE )
 #define ASIO_STANDALONE
+#endif
 #include "asio/asio.hpp"
 
 #include <mutex>
@@ -246,7 +248,7 @@ public:
 		friend class Message;
 		friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	};
-	//! Operator bracket returning an const Argument reference based on \a index. If index is out of
+	//! Subscript operator returns a const Argument& based on \a index. If index is out of
 	//! bounds, throws ExcIndexOutOfBounds.
 	const Argument& operator[]( uint32_t index ) const;
 	//! Evaluates the equality of this with \a other
@@ -293,8 +295,8 @@ private:
 //! Convenient stream operator for Message
 std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	
-//! This class represents an Open Sound Control bundle message. A bundle can
-//! contain any number of Message and Bundle.
+//! Represents an Open Sound Control bundle message. A bundle can contains any number
+//! of Messages and Bundles.
 class Bundle {
 public:
 	
@@ -334,7 +336,7 @@ private:
 	friend class SenderUdp;
 };
 
-//! SenderBase represents an OSC Sender (called a \a server in the OSC spec) and implements a unified
+//! Represents an OSC Sender (called a \a server in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class SenderBase {
 public:
@@ -376,11 +378,13 @@ protected:
 	std::mutex				mSocketErrorFnMutex;
 };
 	
+//! Represents an OSC Sender (called a \a server in the OSC spec) and implements the UDP
+//! transport networking layer.
 class SenderUdp : public SenderBase {
 public:
 	//! Alias protocol for cleaner interfaces
 	using protocol = asio::ip::udp;
-	//! Constructs a Sender (called a \a server in the OSC spec) using udp as transport, whose local endpoint is
+	//! Constructs a Sender (called a \a server in the OSC spec) using UDP as transport, whose local endpoint is
 	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by
 	//! \a destinationHost and \a destinationPort. Takes an optional io_service to construct the socket from.
 	SenderUdp( uint16_t localPort,
@@ -388,16 +392,16 @@ public:
 			   uint16_t destinationPort,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (called a \a server in the OSC spec) whose local endpoint is defined by \a
-	//! localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a destination.
-	//! Takes an optional io_service to construct the socket from.
+	//! Constructs a Sender (called a \a server in the OSC spec) using UDP as transport, whose local endpoint is
+	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
+	//! destination. Takes an optional io_service to construct the socket from.
 	SenderUdp( uint16_t localPort,
 			   const protocol::endpoint &destination,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (called a \a server in the OSC spec) with an already created udp::socket shared_ptr
-	//! \a socket and remote endpoint \a destination. This constructor is good for using already constructed
-	//! sockets for more indepth configuration. Expects the local endpoint to be constructed.
+	//! Constructs a Sender (called a \a server in the OSC spec) using UDP for transport, with an already created
+	//! udp::socket shared_ptr \a socket and remote endpoint \a destination. This constructor is good for using
+	//! already constructed sockets for more indepth configuration. Expects the local endpoint to be constructed.
 	SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination );
 	//! Default virtual constructor
 	virtual ~SenderUdp() = default;
@@ -411,12 +415,12 @@ public:
 	void broadcast( const Bundle &bundle ) { broadcastImpl( bundle.getSharedBuffer() ); }
 	
 protected:
-	//! Opens and Binds the underlying udp socket to the protocol and localEndpoint respectively.
+	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
-	//! Sends the byte buffer /a data to the remote endpoint using the udp socket, asynchronously.
+	//! Sends the byte buffer /a data to the remote endpoint using the UDP socket, asynchronously.
 	void sendImpl( const ByteBufferRef &data ) override;
 	virtual void broadcastImpl( const ByteBufferRef &data );
-	//! Closes the underlying udp socket.
+	//! Closes the underlying UDP socket.
 	void closeImpl() override;
 	
 	UdpSocketRef			mSocket;
@@ -433,10 +437,12 @@ public:
 	SenderUdp& operator=( SenderUdp &&other ) = delete;
 };
 
+//! Represents an OSC Sender (called a \a server in the OSC spec) and implements the TCP
+//! transport networking layer.
 class SenderTcp : public SenderBase {
 public:
 	using protocol = asio::ip::tcp;
-	//! Constructs a Sender (called a \a server in the OSC spec) using tcp as transport, whose local endpoint is
+	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, whose local endpoint is
 	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
 	//! destinationHost and \a destinationPort. Takes an optional io_service to construct the socket from.
 	SenderTcp( uint16_t localPort,
@@ -444,16 +450,17 @@ public:
 			   uint16_t destinationPort,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (called a \a server in the OSC spec) using tcp as transport, whose local endpoint is
+	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, whose local endpoint is
 	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
 	//! destination. Takes an optional io_service to construct the socket from.
 	SenderTcp( uint16_t localPort,
 			   const protocol::endpoint &destination,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Sender (called a \a server in the OSC spec) with an already created tcp::socket shared_ptr
-	//! \a socket and remote endpoint \a destination. This constructor is good for using already constructed
-	//! sockets for more indepth configuration. Expects the local endpoint is already constructed.
+	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, with an already created
+	//! tcp::socket shared_ptr \a socket and remote endpoint \a destination. This constructor is good for using
+	//! already constructed sockets for more indepth configuration. Expects the local endpoint is already
+	//! constructed.
 	SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination );
 	virtual ~SenderTcp() = default;
 	
@@ -466,11 +473,11 @@ public:
 	const protocol::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
 	
 protected:
-	//! Opens and Binds the underlying tcp socket to the protocol and localEndpoint respectively.
+	//! Opens and Binds the underlying TCP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
-	//! Sends the byte buffer /a data to the remote endpoint using the tcp socket, asynchronously.
+	//! Sends the byte buffer /a data to the remote endpoint using the TCP socket, asynchronously.
 	void sendImpl( const ByteBufferRef &data ) override;
-	//! Closes the underlying tcp socket.
+	//! Closes the underlying TCP socket.
 	void closeImpl() override { mSocket->close(); }
 	
 	TcpSocketRef			mSocket;
@@ -487,7 +494,7 @@ public:
 	SenderTcp& operator=( SenderTcp &&other ) = delete;
 };
 
-//! ReceiverBase represents an OSC Receiver(called a \a client in the OSC spec) and implements a unified
+//! Represents an OSC Receiver(called a \a client in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class ReceiverBase {
 public:
@@ -546,22 +553,22 @@ protected:
 	std::mutex				mListenerMutex, mSocketTransportErrorFnMutex;
 };
 	
-//! ReceiverUdp represents an OSC Receiver(called a \a client in the OSC spec) and implements the udp transport
+//! Represents an OSC Receiver(called a \a client in the OSC spec) and implements the UDP transport
 //!	networking layer.
 class ReceiverUdp : public ReceiverBase {
 public:
 	using protocol = asio::ip::udp;
-	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, whose local endpoint
+	//! Constructs a Receiver (called a \a client in the OSC spec) using UDP for transport, whose local endpoint
 	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
 	//! construct the socket from.
 	ReceiverUdp( uint16_t port,
 				 const protocol &protocol = protocol::v4(),
 				 asio::io_service &io = ci::app::App::get()->io_service()  );
-	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, whose local endpoint
+	//! Constructs a Receiver (called a \a client in the OSC spec) using UDP for transport, whose local endpoint
 	//! is defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
 	ReceiverUdp( const protocol::endpoint &localEndpoint,
 				 asio::io_service &io = ci::app::App::get()->io_service() );
-	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, from the already
+	//! Constructs a Receiver (called a \a client in the OSC spec) using UDP for transport, from the already
 	//! constructed udp::socket shared_ptr \a socket. Use this for extra configuration and or sharing sockets
 	//! between sender and receiver.
 	ReceiverUdp( UdpSocketRef socket );
@@ -573,14 +580,15 @@ public:
 	//! Returns the local udp::endpoint of the underlying socket.
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
-	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
+	//! Sets the underlying SocketTransportErrorFn based on the asio::ip::tcp protocol.
 	void setSocketErrorFn( SocketTransportErrorFn<protocol> errorFn );
 	
 protected:
-	//! Opens and Binds the underlying udp socket to the protocol and localEndpoint respectively.
+	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
-	//! Listens on the udp network socket for incoming datagrams. Handles the async receive completion operations. Any errors from asio are handled internally.
+	//! Listens on the UDP network socket for incoming datagrams. Handles the async receive completion operations. Any errors from asio are handled internally.
 	void listenImpl() override;
+	//! Closes the underlying UDP socket.
 	void closeImpl() override { mSocket->close(); }
 	
 	UdpSocketRef						mSocket;
@@ -602,23 +610,23 @@ public:
 	ReceiverUdp& operator=( ReceiverUdp &&other ) = delete;
 };
 
-//! ReceiverTcp represents an OSC Receiver(called a \a client in the OSC spec) and implements the tcp
+//! Represents an OSC Receiver(called a \a client in the OSC spec) and implements the TCP
 //! transport networking layer.
 class ReceiverTcp : public ReceiverBase {
 public:
 	using protocol = asio::ip::tcp;
-	//! Constructs a Receiver (called a \a client in the OSC spec) using tcp for transport, whose local endpoint
+	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, whose local endpoint
 	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
 	//! construct the socket from.
 	ReceiverTcp( uint16_t port,
 				 const protocol &protocol = protocol::v4(),
 				 asio::io_service &service = ci::app::App::get()->io_service()  );
-	//! Constructs a Receiver (called a \a client in the OSC spec) using tcp for transport, whose local endpoint
+	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, whose local endpoint
 	//! is defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
 	ReceiverTcp( const protocol::endpoint &localEndpoint,
 				 asio::io_service &service = ci::app::App::get()->io_service() );
-	//! Constructs a Receiver (called a \a client in the OSC spec) using udp for transport, from the already
-	//! constructed udp::socket shared_ptr \a socket. Use this for extra configuration.
+	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, from the already
+	//! constructed tcp::acceptor shared_ptr \a socket. Use this for extra configuration.
 	ReceiverTcp( AcceptorRef acceptor );
 	virtual ~ReceiverTcp() = default;
 	
@@ -660,9 +668,9 @@ protected:
 		friend class ReceiverTcp;
 	};
 	
-	//! Opens and Binds the underlying tcp acceptor to the protocol and localEndpoint respectively.
+	//! Opens and Binds the underlying TCP acceptor to the protocol and localEndpoint respectively.
 	void bindImpl() override;
-	//! Listens on the underlying tcp network socket for incoming connections.
+	//! Listens on the underlying TCP network socket for incoming connections.
 	void listenImpl() override;
 	//! Launches acceptor to asynchronously accept connections.
 	void accept();

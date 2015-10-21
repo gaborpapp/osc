@@ -43,8 +43,7 @@ void SimpleReceiverApp::setup()
 	});
 	mReceiver.setListener( "/mouseclick/1",
 	[&]( const osc::Message &msg ){
-		vec2 target = vec2( msg[0].flt(), msg[1].flt() ) * vec2( getWindowSize() );
-		timeline().applyPtr( &mCurrentSquarePos, target, 1.0f );
+		mCurrentSquarePos = vec2( msg[0].flt(), msg[1].flt() ) * vec2( getWindowSize() );
 	});
 	mReceiver.bind();
 	mReceiver.listen();
