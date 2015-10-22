@@ -156,34 +156,12 @@ void TestApp::update()
 		message.append( 28.4 );
 		message.append( true );
 		
-#if defined TEST_UDP
-		sendMessageUdp( message );
-#else
-		sendMessageTcp( message );
-#endif
+		mSender.send( message );
+		
 		mMessage = std::move( message );
 //		cout << mMessage << endl;
 	}
 }
-
-#if defined TEST_UDP
-void TestApp::sendMessageUdp( const osc::Message &message )
-{
-	if( getElapsedFrames() % 2 == 0 ) {
-		cout << "broadcasting" << endl;
-		mSender.broadcast( message );
-	}
-	else {
-		cout << "sending regularly" << endl;
-		mSender.send( message );
-	}
-}
-#else
-void TestApp::sendMessageTcp( const osc::Message &message )
-{
-	mSender.send( message );
-}
-#endif
 
 CINDER_APP( TestApp, RendererGl, []( App::Settings *settings ) {
 #if defined( CINDER_MSW )

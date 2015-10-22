@@ -878,30 +878,6 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 	});
 }
 	
-void SenderUdp::broadcastImpl( const ByteBufferRef &data )
-{
-	udp::endpoint broadcastEnd( asio::ip::address_v4::broadcast(), mRemoteEndpoint.port() );
-	mSocket->set_option( asio::socket_base::broadcast(true) );
-	mSocket->async_send_to( asio::buffer( data->data() + 4, data->size() - 4 ), broadcastEnd,
-	[&, data]( const asio::error_code& error, size_t bytesTransferred )
-	{
-		if( error ) {
-			// derive oscAddress
-			std::string oscAddress;
-			if( ! data->empty() )
-				oscAddress = std::string( (const char*)(data.get() + 4) );
-			
-			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
-			if( mSocketTransportErrorFn ) {
-				mSocketTransportErrorFn( error, oscAddress );
-			}
-			else
-				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
-		}
-		mSocket->set_option( asio::socket_base::broadcast(false) );
-	});
-}
-	
 void SenderUdp::closeImpl()
 {
 	mSocket->close();

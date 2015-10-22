@@ -406,15 +406,11 @@ public:
 	//! Returns the remote address of the endpoint associated with this transport.
 	const protocol::endpoint& getRemoteAddress() const { return mRemoteEndpoint; }
 	
-	void broadcast( const Message &message ) { broadcastImpl( message.getSharedBuffer() ); }
-	void broadcast( const Bundle &bundle ) { broadcastImpl( bundle.getSharedBuffer() ); }
-	
 protected:
 	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
 	//! Sends the byte buffer /a data to the remote endpoint using the UDP socket, asynchronously.
 	void sendImpl( const ByteBufferRef &data ) override;
-	virtual void broadcastImpl( const ByteBufferRef &data );
 	//! Closes the underlying UDP socket.
 	void closeImpl() override;
 	
