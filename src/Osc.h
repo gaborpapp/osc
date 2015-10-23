@@ -74,6 +74,12 @@ public:
 	Message& operator=( const Message & ) = delete;
 	Message( Message && ) NOEXCEPT;
 	Message& operator=( Message && ) NOEXCEPT;
+	template <typename... Args>
+	Message(const std::string& address, Args&&... args)
+		: Message(address)
+	{
+		appendArgs(std::forward<Args>(args)...);
+	}
 	~Message() = default;
 	
 	// Functions for appending OSC 1.0 types
@@ -119,7 +125,7 @@ public:
     template <typename T, typename... Args>
     void appendArgs(T&& t, Args&&... args)
     {
-        appendArgs(std::forward(t));
+        appendArgs(std::forward<T>(t));
         appendArgs(std::forward<Args>(args)...);
     }
     
