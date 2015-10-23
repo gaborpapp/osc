@@ -177,8 +177,8 @@ void TestApp::update()
 	}
 }
 
-CINDER_APP( TestApp, RendererGl, []( App::Settings *settings ) {
 #if defined( CINDER_MSW )
-	settings->setConsoleWindowEnabled();
+CINDER_APP(TestApp, RendererGl, [](App::Settings *settings) { settings->setConsoleWindowEnabled(); })
+#else
+CINDER_APP(TestApp, RendererGl);
 #endif
-})
