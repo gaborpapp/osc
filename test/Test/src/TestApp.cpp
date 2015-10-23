@@ -32,6 +32,8 @@ class TestApp : public App {
 	osc::SenderTcp		mSender;
 #endif
 	osc::Message		mMessage;
+    /// For testing variadic templated functions
+    osc::Message        mMessage2;
 	
 	bool mIsConnected = false;
 };
@@ -116,6 +118,12 @@ TestApp::TestApp()
 		auto messagesTheSame = (mMessage == message);
 		cout << "Messages are the same: " << (messagesTheSame ? "true" : "false") << endl;
 	});
+//    mReceiver.setListener("/app/11",
+//                          [&]( const osc::Message& message ) {
+//                              cout << message << endl;
+//                              auto messagesTheSame = (mMessage2 == message);
+//                              cout << "Message2 the same: " << std::boolalpha << messagesTheSame << endl;
+//                          });
 }
 
 void TestApp::update()
@@ -160,6 +168,12 @@ void TestApp::update()
 		
 		mMessage = std::move( message );
 //		cout << mMessage << endl;
+        
+        {
+            mMessage2 = osc::Message("/app/11");
+            mMessage2.appendArgs(i);
+            mSender.send(mMessage2);
+        }
 	}
 }
 

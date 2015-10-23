@@ -114,6 +114,20 @@ public:
 	void appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 );
 	// TODO: figure out if array is useful.
 	// void appendArray( void* array, size_t size );
+    
+    // Variadic template append function to add multiple args of arbitrary type
+    template <typename T, typename... Args>
+    void appendArgs(T&& t, Args&&... args)
+    {
+        appendArgs(std::forward(t));
+        appendArgs(std::forward<Args>(args)...);
+    }
+    
+    template <typename T>
+    void appendArgs(T&& t)
+    {
+        append(std::forward<T>(t));
+    }
 	
 	//! Returns the int32_t located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
