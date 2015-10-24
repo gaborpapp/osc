@@ -143,6 +143,26 @@ bool Argument::operator==(const Argument &arg ) const
 			mOffset == arg.mOffset &&
 			mSize == arg.mSize;
 }
+	
+const char* Message::Argument::argTypeToString( ArgType type )
+{
+	switch ( type ) {
+		case ArgType::INTEGER_32: return "INTEGER_32"; break;
+		case ArgType::FLOAT: return "FLOAT"; break;
+		case ArgType::DOUBLE: return "DOUBLE"; break;
+		case ArgType::STRING: return "STRING"; break;
+		case ArgType::BLOB: return "BLOB"; break;
+		case ArgType::MIDI: return "MIDI"; break;
+		case ArgType::TIME_TAG: return "TIME_TAG"; break;
+		case ArgType::INTEGER_64: return "INTEGER_64"; break;
+		case ArgType::BOOL_T: return "BOOL_T"; break;
+		case ArgType::BOOL_F: return "BOOL_F"; break;
+		case ArgType::CHAR: return "CHAR"; break;
+		case ArgType::NULL_T: return "NULL_T"; break;
+		case ArgType::IMPULSE: return "IMPULSE"; break;
+		default: return "Unknown ArgType"; break;
+	}
+}
 
 ArgType Argument::translateCharToArgType( char type )
 {
@@ -159,29 +179,14 @@ ArgType Argument::translateCharToArgType( char type )
 		case 'T': return ArgType::BOOL_T; break;
 		case 'F': return ArgType::BOOL_F; break;
 		case 'N': return ArgType::NULL_T; break;
-		case 'I': return ArgType::INFINITUM; break;
+		case 'I': return ArgType::IMPULSE; break;
 		default: return ArgType::NULL_T; break;
 	}
 }
 
 char Argument::translateArgTypeToChar( ArgType type )
 {
-	switch ( type ) {
-		case ArgType::INTEGER_32: return 'i'; break;
-		case ArgType::FLOAT: return 'f'; break;
-		case ArgType::STRING: return 's'; break;
-		case ArgType::BLOB: return 'b'; break;
-		case ArgType::INTEGER_64: return 'h'; break;
-		case ArgType::TIME_TAG: return 't'; break;
-		case ArgType::DOUBLE: return 'd'; break;
-		case ArgType::CHAR: return 'c'; break;
-		case ArgType::MIDI: return 'm'; break;
-		case ArgType::BOOL_T: return 'T'; break;
-		case ArgType::BOOL_F: return 'F'; break;
-		case ArgType::NULL_T: return 'N'; break;
-		case ArgType::INFINITUM: return 'I'; break;
-		case ArgType::NONE: return 'N'; break;
-	}
+	return static_cast<char>(type);
 }
 
 void Argument::swapEndianForTransmit( uint8_t *buffer ) const
@@ -194,44 +199,45 @@ void Argument::swapEndianForTransmit( uint8_t *buffer ) const
 			int32_t a = htonl( *reinterpret_cast<int32_t*>(ptr) );
 			memcpy( ptr, &a, sizeof( int32_t ) );
 		}
-			break;
+		break;
 		case ArgType::INTEGER_64:
 		case ArgType::TIME_TAG: {
 			uint64_t a = htonll( *reinterpret_cast<uint64_t*>(ptr) );
 			memcpy( ptr, &a, sizeof( uint64_t ) );
 		}
-			break;
+		break;
 		case ArgType::FLOAT: {
 			int32_t a = htonf( *reinterpret_cast<float*>(ptr) );
 			memcpy( ptr, &a, sizeof( float ) );
 		}
-			break;
+		break;
 		case ArgType::DOUBLE: {
 			int64_t a = htond( *reinterpret_cast<double*>(ptr) );
 			memcpy( ptr, &a, sizeof( double ) );
 		}
-			break;
+		break;
 		default: break;
 	}
 }
 
 void Argument::outputValueToStream( std::ostream &ostream ) const
 {
-	auto ptr = &mOwner->mDataBuffer[mOffset];
+	ostream << "<" << argTypeToString( mType ) << ">: ";
 	switch ( mType ) {
-		case ArgType::INTEGER_32: ostream << *reinterpret_cast<int32_t*>( ptr ); break;
-		case ArgType::FLOAT: ostream << *reinterpret_cast<float*>( ptr ); break;
-		case ArgType::STRING: ostream << reinterpret_cast<const char*>( ptr ); break;
-		case ArgType::BLOB: ostream << "Size: " << *reinterpret_cast<int32_t*>( ptr ); break;
-		case ArgType::INTEGER_64: ostream << *reinterpret_cast<int64_t*>( ptr ); break;
-		case ArgType::TIME_TAG: ostream << *reinterpret_cast<int64_t*>( ptr ); break;
-		case ArgType::DOUBLE: ostream << *reinterpret_cast<double*>( ptr ); break;
+		case ArgType::INTEGER_32: ostream << *reinterpret_cast<int32_t*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::FLOAT: ostream << *reinterpret_cast<float*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::STRING: ostream << reinterpret_cast<const char*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::BLOB: ostream << "Size: " << *reinterpret_cast<int32_t*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::INTEGER_64: ostream << *reinterpret_cast<int64_t*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::TIME_TAG: ostream << *reinterpret_cast<int64_t*>( &mOwner->mDataBuffer[mOffset] ); break;
+		case ArgType::DOUBLE: ostream << *reinterpret_cast<double*>( &mOwner->mDataBuffer[mOffset] ); break;
 		case ArgType::CHAR: {
-			char v = *reinterpret_cast<char*>( ptr );
+			char v = *reinterpret_cast<char*>( &mOwner->mDataBuffer[mOffset] );
 			ostream << int(v);
 		}
 			break;
 		case ArgType::MIDI: {
+			auto ptr = &mOwner->mDataBuffer[mOffset];
 			ostream <<	" Port: "	<< int( *( ptr + 0 ) ) <<
 						" Status: " << int( *( ptr + 1 ) ) <<
 						" Data1: "  << int( *( ptr + 2 ) ) <<
@@ -241,7 +247,7 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 		case ArgType::BOOL_T: ostream << "True"; break;
 		case ArgType::BOOL_F: ostream << "False"; break;
 		case ArgType::NULL_T: ostream << "Null"; break;
-		case ArgType::INFINITUM: ostream << "Infinitum"; break;
+		case ArgType::IMPULSE: ostream << "IMPULSE"; break;
 		default: ostream << "Unknown"; break;
 	}
 }
@@ -354,7 +360,9 @@ void Message::createCache() const
 	std::string address( mAddress );
 	size_t addressLen = address.size() + getTrailingZeros( address.size() );
 	std::vector<uint8_t> dataArray( mDataBuffer );
-	std::vector<char> typesArray( mDataViews.size() + getTrailingZeros( mDataViews.size() ), 0 );
+	// adding one for ',' character, which was the sourc of a particularly ugly bug
+	auto typesSize = mDataViews.size() + 1;
+	std::vector<char> typesArray( typesSize + getTrailingZeros( typesSize ) , 0 );
 	
 	typesArray[0] = ',';
 	int i = 1;
@@ -546,8 +554,7 @@ bool Argument::convertible() const
 		case ArgType::BOOL_T: return std::is_same<T, bool>::value;
 		case ArgType::BOOL_F: return std::is_same<T, bool>::value;
 		case ArgType::NULL_T: return false;
-		case ArgType::INFINITUM: return false;
-		case ArgType::NONE: return false;
+		case ArgType::IMPULSE: return false;
 		default: return false;
 	}
 }
@@ -781,10 +788,14 @@ std::ostream& operator<<( std::ostream &os, const Message &rhs )
 {
 	os << "Address: " << rhs.getAddress() << std::endl;
 	for( auto &dataView : rhs.mDataViews ) {
-		os << "\t<" << argTypeToString( dataView.getType() ) << ">: ";
-		dataView.outputValueToStream( os );
-		os << std::endl;
+		os << "\t" << dataView << std::endl;
 	}
+	return os;
+}
+	
+std::ostream& operator<<( std::ostream &os, const Argument &rhs )
+{
+	rhs.outputValueToStream( os );
 	return os;
 }
 	
@@ -1324,27 +1335,6 @@ void ReceiverTcp::closeImpl()
 	}
 	mConnections.clear();
 }
-	
-const char* argTypeToString( ArgType type )
-{
-	switch ( type ) {
-		case ArgType::INTEGER_32: return "INTEGER_32"; break;
-		case ArgType::FLOAT: return "FLOAT"; break;
-		case ArgType::DOUBLE: return "DOUBLE"; break;
-		case ArgType::STRING: return "STRING"; break;
-		case ArgType::BLOB: return "BLOB"; break;
-		case ArgType::MIDI: return "MIDI"; break;
-		case ArgType::TIME_TAG: return "TIME_TAG"; break;
-		case ArgType::INTEGER_64: return "INTEGER_64"; break;
-		case ArgType::BOOL_T: return "BOOL_T"; break;
-		case ArgType::BOOL_F: return "BOOL_F"; break;
-		case ArgType::CHAR: return "CHAR"; break;
-		case ArgType::NULL_T: return "NULL_T"; break;
-		case ArgType::INFINITUM: return "INFINITUM"; break;
-		case ArgType::NONE: return "NONE"; break;
-		default: return "Unknown ArgType"; break;
-	}
-}
 
 namespace time {
 
@@ -1357,7 +1347,7 @@ uint64_t get_current_ntp_time( milliseconds offsetMillis )
 	return ( sec << 32 ) + ( usec % 1000000L );
 }
 	
-uint64_t getFutureClockWithOffset( milliseconds offsetFuture, uint64_t localOffsetSecs, uint64_t localOffsetUSecs )
+uint64_t getFutureClockWithOffset( milliseconds offsetFuture, int64_t localOffsetSecs, int64_t localOffsetUSecs )
 {
 	uint64_t ntp_time = get_current_ntp_time( offsetFuture );
 	
@@ -1405,7 +1395,7 @@ std::string getClockString( uint64_t ntpTime, bool includeDate )
 	return std::string( buffer );
 }
 
-void calcOffsetFromSystem( uint64_t ntpTime, uint64_t *localOffsetSecs, uint64_t *localOffsetUSecs )
+void calcOffsetFromSystem( uint64_t ntpTime, int64_t *localOffsetSecs, int64_t *localOffsetUSecs )
 {
 	uint64_t current_ntp_time = time::get_current_ntp_time();
 	

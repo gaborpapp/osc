@@ -48,7 +48,7 @@
 namespace osc {
 	
 //! Argument types suported by the Message class
-enum class ArgType { INTEGER_32, FLOAT, DOUBLE, STRING, BLOB, MIDI, TIME_TAG, INTEGER_64, BOOL_T, BOOL_F, CHAR, NULL_T, INFINITUM, NONE };
+enum class ArgType : char { INTEGER_32 = 'i', FLOAT = 'f', DOUBLE = 'd', STRING = 's', BLOB = 'b', MIDI = 'm', TIME_TAG = 't', INTEGER_64 = 'h', BOOL_T = 'T', BOOL_F = 'F', CHAR = 'c', NULL_T = 'N', IMPULSE = 'I', NONE = NULL_T };
 	
 // Forward declarations
 class Message;
@@ -105,8 +105,8 @@ public:
 	void append( bool v );
 	//! Appends a Null (or nil) to the back of the message.
 	void appendNull() { mIsCached = false; mDataViews.emplace_back( this, ArgType::NULL_T, -1, 0 ); }
-	//! Appends an Impulse (or Infinitum) to the back of the message
-	void appendImpulse() { mIsCached = false; mDataViews.emplace_back( this, ArgType::INFINITUM, -1, 0 ); }
+	//! Appends an Impulse (or IMPULSE) to the back of the message
+	void appendImpulse() { mIsCached = false; mDataViews.emplace_back( this, ArgType::IMPULSE, -1, 0 ); }
 	
 	// Functions for appending nonstandard types
 	
@@ -237,7 +237,11 @@ public:
 		
 		//! Evaluates the equality of this with \a other
 		bool operator==( const Argument &other ) const;
-
+		
+		
+		//! Converts ArgType \a type to c-string for debug purposes.
+		static const char* argTypeToString( ArgType type );
+		
 	private:
 		//! Simple helper to stream a message's contents to the console.
 		void		outputValueToStream( std::ostream &ostream ) const;
@@ -262,6 +266,7 @@ public:
 		
 		friend class Message;
 		friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
+		friend std::ostream& operator<<( std::ostream &os, const Message::Argument &rhs );
 	};
 	//! Subscript operator returns a const Argument& based on \a index. If index is out of
 	//! bounds, throws ExcIndexOutOfBounds.
@@ -305,10 +310,28 @@ private:
 	friend class SenderUdp;
 	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
+	
+	class ExcIndexOutOfBounds : public ci::Exception {
+	public:
+		ExcIndexOutOfBounds( const std::string &address, uint32_t index )
+		: Exception( std::string( std::to_string( index ) + " out of bounds from address, " + address ) )
+		{}
+	};
+	
+	class ExcNonConvertible : public ci::Exception {
+	public:
+		ExcNonConvertible( const std::string &address, ArgType actualType, ArgType convertToType )
+		: Exception( address + ": expected type: " +
+					Argument::argTypeToString( convertToType ) +
+					", actual type: " +
+					Argument::argTypeToString( actualType ) )
+		{}
+	};
 };
 
 //! Convenient stream operator for Message
 std::ostream& operator<<( std::ostream &os, const Message &rhs );
+std::ostream& operator<<( std::ostream &os, const Message::Argument &rhs );
 	
 //! Represents an Open Sound Control bundle message. A bundle can contains any number
 //! of Messages and Bundles.
@@ -709,34 +732,17 @@ public:
 	//! Non-Moveable.
 	ReceiverTcp& operator=( ReceiverTcp &&other ) = delete;
 };
-	
-//! Converts ArgType \a type to c-string for debug purposes.
-const char* argTypeToString( ArgType type );
 
 namespace time {
 	using milliseconds = std::chrono::milliseconds;
 	//! Returns system clock time.
 	uint64_t get_current_ntp_time( milliseconds offsetMillis = milliseconds( 0 ) );
 	//! Returns the current presentation time as NTP time, which may include an offset to the system clock.
-	uint64_t getFutureClockWithOffset( milliseconds offsetFuture = milliseconds( 0 ), uint64_t localOffsetSecs = 0, uint64_t localOffsetUSecs = 0 );
+	uint64_t getFutureClockWithOffset( milliseconds offsetFuture = milliseconds( 0 ), int64_t localOffsetSecs = 0, int64_t localOffsetUSecs = 0 );
 	//! Returns the current presentation time as a string.
 	std::string getClockString( uint64_t ntpTime, bool includeDate = false );
 	//! Sets the current presentation time as NTP time, from which an offset to the system clock is calculated.
-	void calcOffsetFromSystem( uint64_t ntpTime, uint64_t *localOffsetSecs, uint64_t *localOffsetUSecs );
-};
-	
-class ExcIndexOutOfBounds : public ci::Exception {
-public:
-	ExcIndexOutOfBounds( const std::string &address, uint32_t index )
-	: Exception( std::string( std::to_string( index ) + " out of bounds from address, " + address ) )
-	{}
-};
-
-class ExcNonConvertible : public ci::Exception {
-public:
-	ExcNonConvertible( const std::string &address, ArgType actualType, ArgType convertToType )
-	: Exception( address + ": expected type: " + argTypeToString( convertToType ) + ", actual type: " + argTypeToString( actualType ) )
-	{}
+	void calcOffsetFromSystem( uint64_t ntpTime, int64_t *localOffsetSecs, int64_t *localOffsetUSecs );
 };
 	
 }
