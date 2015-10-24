@@ -17,13 +17,10 @@
 		00B9955A1B128DF400A5C623 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B995581B128DF400A5C623 /* IOKit.framework */; };
 		00B9955B1B128DF400A5C623 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B995591B128DF400A5C623 /* IOSurface.framework */; };
 		5323E6B20EAFCA74003A9687 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5323E6B10EAFCA74003A9687 /* CoreVideo.framework */; };
-		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
-		3DC7D64044D14CE9B82E3612 /* Osc.h in Headers */ = {isa = PBXBuildFile; fileRef = B14083EE16564A3CBFF9EF54 /* Osc.h */; };
 		6F33E655E27C41C1B606F24E /* Osc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 908F019920DA4062958DC84F /* Osc.cpp */; };
-		061EEECD4E564F0D9F64A866 /* BroadcastSender_Prefix.pch in Headers */ = {isa = PBXBuildFile; fileRef = 790CAEA414E34194AD5AB208 /* BroadcastSender_Prefix.pch */; };
-		0A845973FF934B7EA6FB73F1 /* CinderApp.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9477DAEC52CD48919CAD36F6 /* CinderApp.icns */; };
-		10E04A72F5B7425AB733A782 /* Resources.h in Headers */ = {isa = PBXBuildFile; fileRef = E6B3C05D9AE64BEC96733F6E /* Resources.h */; };
+		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		98D44A1EDB5B4F97955CCE63 /* BroadcastSenderApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7F6A8939E26B43CD91A8AFEB /* BroadcastSenderApp.cpp */; };
+		B37BB9CF1BDBC9D700311784 /* CinderApp.icns in Resources */ = {isa = PBXBuildFile; fileRef = B37BB9CE1BDBC9D700311784 /* CinderApp.icns */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,14 +37,14 @@
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
 		5323E6B10EAFCA74003A9687 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = /System/Library/Frameworks/CoreVideo.framework; sourceTree = "<absolute>"; };
+		790CAEA414E34194AD5AB208 /* BroadcastSender_Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = "\"\""; path = BroadcastSender_Prefix.pch; sourceTree = "<group>"; };
+		7F6A8939E26B43CD91A8AFEB /* BroadcastSenderApp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; name = BroadcastSenderApp.cpp; path = ../src/BroadcastSenderApp.cpp; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* BroadcastSender.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BroadcastSender.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7F6A8939E26B43CD91A8AFEB /* BroadcastSenderApp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; path = ../src/BroadcastSenderApp.cpp; sourceTree = "<group>"; name = BroadcastSenderApp.cpp; };
-		E6B3C05D9AE64BEC96733F6E /* Resources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../include/Resources.h; sourceTree = "<group>"; name = Resources.h; };
-		9477DAEC52CD48919CAD36F6 /* CinderApp.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = ../resources/CinderApp.icns; sourceTree = "<group>"; name = CinderApp.icns; };
-		DFDD5C43D9B6491AA0FD2F73 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; name = Info.plist; };
-		790CAEA414E34194AD5AB208 /* BroadcastSender_Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = "\"\""; path = BroadcastSender_Prefix.pch; sourceTree = "<group>"; name = BroadcastSender_Prefix.pch; };
-		908F019920DA4062958DC84F /* Osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; path = ../../../src/Osc.cpp; sourceTree = "<group>"; name = Osc.cpp; };
-		B14083EE16564A3CBFF9EF54 /* Osc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../../../src/Osc.h; sourceTree = "<group>"; name = Osc.h; };
+		908F019920DA4062958DC84F /* Osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.cpp; name = Osc.cpp; path = ../../../src/Osc.cpp; sourceTree = "<group>"; };
+		B14083EE16564A3CBFF9EF54 /* Osc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Osc.h; path = ../../../src/Osc.h; sourceTree = "<group>"; };
+		B37BB9CE1BDBC9D700311784 /* CinderApp.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; name = CinderApp.icns; path = ../../../../../samples/data/CinderApp.icns; sourceTree = "<group>"; };
+		DFDD5C43D9B6491AA0FD2F73 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E6B3C05D9AE64BEC96733F6E /* Resources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Resources.h; path = ../include/Resources.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +69,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		01B97315FEAEA392516A2CEA /* Blocks */ = {
+			isa = PBXGroup;
+			children = (
+				2928EA30F8F34807A83F47C6 /* newosc */,
+			);
+			name = Blocks;
+			sourceTree = "<group>";
+		};
 		080E96DDFE201D6D7F000001 /* Source */ = {
 			isa = PBXGroup;
 			children = (
@@ -115,6 +120,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		2928EA30F8F34807A83F47C6 /* newosc */ = {
+			isa = PBXGroup;
+			children = (
+				D92D4B37061C493D9CB41BCE /* src */,
+			);
+			name = newosc;
+			sourceTree = "<group>";
+		};
 		29B97314FDCFA39411CA2CEA /* BroadcastSender */ = {
 			isa = PBXGroup;
 			children = (
@@ -126,31 +139,6 @@
 				19C28FACFE9D520D11CA2CBB /* Products */,
 			);
 			name = BroadcastSender;
-			sourceTree = "<group>";
-		};
-		D92D4B37061C493D9CB41BCE /* src */ = {
-			isa = PBXGroup;
-			children = (
-				908F019920DA4062958DC84F /* Osc.cpp */,
-				B14083EE16564A3CBFF9EF54 /* Osc.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
-		2928EA30F8F34807A83F47C6 /* newosc */ = {
-			isa = PBXGroup;
-			children = (
-				D92D4B37061C493D9CB41BCE /* src */,
-			);
-			name = newosc;
-			sourceTree = "<group>";
-		};
-		01B97315FEAEA392516A2CEA /* Blocks */ = {
-			isa = PBXGroup;
-			children = (
-				2928EA30F8F34807A83F47C6 /* newosc */,
-			);
-			name = Blocks;
 			sourceTree = "<group>";
 		};
 		29B97315FDCFA39411CA2CEA /* Headers */ = {
@@ -165,7 +153,7 @@
 		29B97317FDCFA39411CA2CEA /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				9477DAEC52CD48919CAD36F6 /* CinderApp.icns */,
+				B37BB9CE1BDBC9D700311784 /* CinderApp.icns */,
 				DFDD5C43D9B6491AA0FD2F73 /* Info.plist */,
 			);
 			name = Resources;
@@ -178,6 +166,15 @@
 				1058C7A2FEA54F0111CA2CBB /* Other Frameworks */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D92D4B37061C493D9CB41BCE /* src */ = {
+			isa = PBXGroup;
+			children = (
+				908F019920DA4062958DC84F /* Osc.cpp */,
+				B14083EE16564A3CBFF9EF54 /* Osc.h */,
+			);
+			name = src;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -206,6 +203,8 @@
 /* Begin PBXProject section */
 		29B97313FDCFA39411CA2CEA /* Project object */ = {
 			isa = PBXProject;
+			attributes = {
+			};
 			buildConfigurationList = C01FCF4E08A954540054247B /* Build configuration list for PBXProject "BroadcastSender" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
@@ -230,7 +229,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0A845973FF934B7EA6FB73F1 /* CinderApp.icns in Resources */,
+				B37BB9CF1BDBC9D700311784 /* CinderApp.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -253,17 +252,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = BroadcastSender_Prefix.pch;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = BroadcastSender_Prefix.pch;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
@@ -285,12 +284,12 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
 				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = BroadcastSender_Prefix.pch;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"NDEBUG=1",
 					"$(inherited)",
 				);
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = BroadcastSender_Prefix.pch;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
@@ -307,7 +306,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				CINDER_PATH = "../../../../..";
+				CINDER_PATH = ../../../../..;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++11";
 				CLANG_CXX_LIBRARY = "libc++";
 				ENABLE_TESTABILITY = YES;
@@ -317,10 +316,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
-				USER_HEADER_SEARCH_PATHS = (
-					"\"$(CINDER_PATH)/include\" ../include",
-					../../../src,
-				);
+				USER_HEADER_SEARCH_PATHS = "\"$(CINDER_PATH)/include\" ../include ../../../src";
 			};
 			name = Debug;
 		};
@@ -328,7 +324,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				CINDER_PATH = "../../../../..";
+				CINDER_PATH = ../../../../..;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++11";
 				CLANG_CXX_LIBRARY = "libc++";
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
@@ -336,10 +332,7 @@
 				HEADER_SEARCH_PATHS = "\"$(CINDER_PATH)/include\"";
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				SDKROOT = macosx;
-				USER_HEADER_SEARCH_PATHS = (
-					"\"$(CINDER_PATH)/include\" ../include",
-					../../../src,
-				);
+				USER_HEADER_SEARCH_PATHS = "\"$(CINDER_PATH)/include\" ../include ../../../src";
 			};
 			name = Release;
 		};

@@ -12,7 +12,7 @@ using namespace std;
 using namespace asio;
 using namespace asio::ip;
 
-const uint16_t destinationPort = 10000;
+const uint16_t destinationPort = 10001;
 
 class BroadcastSenderApp : public App {
 public:
@@ -31,9 +31,10 @@ public:
 };
 
 BroadcastSenderApp::BroadcastSenderApp()
-: mSocket( new udp::socket( App::get()->io_service(), udp::endpoint( udp::v4(), 10001 ) ) ),
+: mSocket( new udp::socket( App::get()->io_service(), udp::endpoint( udp::v4(), 10000 ) ) ),
 	mSender( mSocket, udp::endpoint( address_v4::broadcast(), destinationPort ) )
 {
+	mSocket->set_option( asio::socket_base::broadcast(true) );
 }
 
 void BroadcastSenderApp::setup()

@@ -57,7 +57,6 @@ void SimpleReceiverApp::draw()
 	
 	gl::drawStrokedCircle( mCurrentCirclePos, 100 );
 	gl::drawSolidRect( Rectf( mCurrentSquarePos - vec2( 50 ), mCurrentSquarePos + vec2( 50 ) ) );
-	
 }
 
 CINDER_APP( SimpleReceiverApp, RendererGl, []( App::Settings *settings ) {
