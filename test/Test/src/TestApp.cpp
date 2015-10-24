@@ -32,6 +32,8 @@ class TestApp : public App {
 	osc::SenderTcp		mSender;
 #endif
 	osc::Message		mMessage;
+    /// For testing variadic templated functions
+    osc::Message        mMessage2;
 	
 	bool mIsConnected = false;
 };
@@ -116,6 +118,12 @@ TestApp::TestApp()
 		auto messagesTheSame = (mMessage == message);
 		cout << "Messages are the same: " << (messagesTheSame ? "true" : "false") << endl;
 	});
+    mReceiver.setListener("/message2",
+                          [&]( const osc::Message& message ) {
+                              cout << message << endl;
+                              auto messagesTheSame = (mMessage2 == message);
+                              cout << "Message2 the same: " << std::boolalpha << messagesTheSame << endl;
+                          });
 }
 
 void TestApp::update()
@@ -160,11 +168,17 @@ void TestApp::update()
 		
 		mMessage = std::move( message );
 //		cout << mMessage << endl;
+        
+        {
+			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), std::string("5 string"), double(2), float(3));
+			cout << "As constructed: " << mMessage2 << endl;
+            mSender.send(mMessage2);
+        }
 	}
 }
 
-CINDER_APP( TestApp, RendererGl, []( App::Settings *settings ) {
 #if defined( CINDER_MSW )
-	settings->setConsoleWindowEnabled();
+CINDER_APP(TestApp, RendererGl, [](App::Settings *settings) { settings->setConsoleWindowEnabled(); })
+#else
+CINDER_APP(TestApp, RendererGl);
 #endif
-})
