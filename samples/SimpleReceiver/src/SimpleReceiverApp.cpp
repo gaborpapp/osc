@@ -59,9 +59,11 @@ void SimpleReceiverApp::draw()
 	gl::drawSolidRect( Rectf( mCurrentSquarePos - vec2( 50 ), mCurrentSquarePos + vec2( 50 ) ) );
 }
 
-CINDER_APP( SimpleReceiverApp, RendererGl, []( App::Settings *settings ) {
+auto settingsFunc = []( App::Settings *settings ) {
 #if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
 #endif
 	settings->setMultiTouchEnabled( false );
-})
+};
+
+CINDER_APP( SimpleReceiverApp, RendererGl, settingsFunc )
