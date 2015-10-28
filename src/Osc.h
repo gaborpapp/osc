@@ -90,10 +90,12 @@ public:
 	void append( float v );
 	//! Appends a string to the back of the message.
 	void append( const std::string& v );
+	//! Appends a null-terminated c-string to the back of message.
+	void append( const char v[] );
 	//! Appends an osc blob to the back of the message.
 	void appendBlob( void* blob, uint32_t size );
 	//! Appends an osc blob to the back of the message.
-	void appendBlob( const ci::Buffer &buffer );
+	void append( const ci::Buffer &buffer );
 	
 	// Functions for appending OSC 1.1 types
 	
@@ -120,11 +122,31 @@ public:
 	void appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 );
 	// TODO: figure out if array is useful.
 	// void appendArray( void* array, size_t size );
-    
+	
+	template<class T>
+	struct is_c_str
+	: std::integral_constant<
+	bool,
+	std::is_same<char const *, typename std::decay<T>::type>::value ||
+	std::is_same<char *, typename std::decay<T>::type>::value ||
+	std::is_same<char[], typename std::decay<T>::type>::value
+	> {};
+	
     // Variadic template append function to add multiple args of arbitrary type
     template <typename T, typename... Args>
     void appendArgs(T&& t, Args&&... args)
     {
+		// Accepted types below
+		static_assert(std::is_same<T, int32_t>::value ||
+					  std::is_same<T, int64_t>::value ||
+					  std::is_same<T, std::string>::value ||
+					  std::is_same<T, float>::value ||
+					  std::is_same<T, double>::value ||
+					  std::is_same<T, ci::Buffer>::value ||
+					  std::is_same<T, char>::value ||
+					  std::is_same<T, bool>::value ||
+					  is_c_str<T>::value,
+					  "Unsupported Type in Append Args" );
         appendArgs(std::forward<T>(t));
         appendArgs(std::forward<Args>(args)...);
     }
@@ -135,15 +157,22 @@ public:
         append(std::forward<T>(t));
     }
 	
+	template <typename T>
+	T getArg( uint32_t index );
+	
 	//! Returns the int32_t located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
-	int32_t		getArgInt( uint32_t index ) const;
+	int32_t		getArgInt32( uint32_t index ) const;
 	//! Returns the float located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
 	float		getArgFloat( uint32_t index ) const;
 	//! Returns the string located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
 	std::string getArgString( uint32_t index ) const;
+	//! Supplies the string data located at \a index to the \a dataPtr and \a size. Note: Doesn't copy.
+	//! If index is out of bounds, throws ExcIndexOutOfBounds. If argument isn't convertible to this type,
+	//! throws ExcNonConvertible
+	void		getArgStringData( uint32_t index, const char **dataPtr, uint32_t *size ) const;
 	//! Returns the time_tag located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
 	int64_t		getArgTime( uint32_t index ) const;
@@ -169,7 +198,7 @@ public:
 	//! Supplies the blob data located at \a index to the \a dataPtr and \a size. Note: Doesn't copy.
 	//! If index is out of bounds, throws ExcIndexOutOfBounds. If argument isn't convertible to this type,
 	//! throws ExcNonConvertible
-	void getArgBlobData( uint32_t index, const void **dataPtr, size_t *size ) const;
+	void		getArgBlobData( uint32_t index, const void **dataPtr, size_t *size ) const;
 	
 	//! Returns the argument type located at \a index.
 	ArgType		getArgType( uint32_t index ) const;
@@ -225,7 +254,7 @@ public:
 		//! Returns the underlying argument as a "deep-copied" ci::Buffer. If argument isn't convertible
 		//! to this type, throws ExcNonConvertible
 		ci::Buffer	blob() const;
-		//! Supplies the blob data located at \a index to the \a dataPtr and \a size. Note: Doesn't copy.
+		//! Supplies the blob data to the \a dataPtr and \a size. Note: Doesn't copy.
 		//! If argument isn't convertible to this type, throws ExcNonConvertible
 		void		blobData( const void **dataPtr, size_t *size ) const;
 		//! Returns the underlying argument as a char. If argument isn't convertible to this type,
@@ -234,10 +263,12 @@ public:
 		//! Returns the underlying argument as a string. If argument isn't convertible to this type,
 		//! throws ExcNonConvertible
 		std::string string() const;
+		//! Supplies the string data to the \a dataPtr and \a size. Note: Doesn't copy.
+		//! If argument isn't convertible to this type, throws ExcNonConvertible
+		void		stringData( const char **dataPtr, uint32_t *size ) const;
 		
 		//! Evaluates the equality of this with \a other
 		bool operator==( const Argument &other ) const;
-		
 		
 		//! Converts ArgType \a type to c-string for debug purposes.
 		static const char* argTypeToString( ArgType type );
@@ -328,6 +359,15 @@ private:
 		{}
 	};
 };
+
+template<> int32_t Message::getArg( uint32_t index ) { return getArgInt32( index ); }
+template<> float Message::getArg( uint32_t index ) { return getArgFloat( index ); }
+template<> std::string Message::getArg( uint32_t index ) { return getArgString( index ); }
+template<> ci::Buffer Message::getArg( uint32_t index ) { return getArgBlob( index ); }
+template<> int64_t Message::getArg( uint32_t index ) { return getArgInt64( index ); }
+template<> double Message::getArg( uint32_t index ) { return getArgDouble( index ); }
+template<> char Message::getArg( uint32_t index ) { return getArgChar( index ); }
+template<> bool Message::getArg( uint32_t index ) { return getArgBool( index ); }
 
 //! Convenient stream operator for Message
 std::ostream& operator<<( std::ostream &os, const Message &rhs );

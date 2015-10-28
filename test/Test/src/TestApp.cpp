@@ -151,7 +151,7 @@ void TestApp::update()
 		message.append( test );
 		
 		auto buffer = ci::Buffer::create( &mTransmitStruct, sizeof(TestStruct) );
-		message.appendBlob( *buffer );
+		message.append( *buffer );
 		mTransmitStruct.myInt += 33;
 		mTransmitStruct.myFloat += 45.4f;
 		mTransmitStruct.myDouble += 1.01;
@@ -170,7 +170,8 @@ void TestApp::update()
 //		cout << mMessage << endl;
         
         {
-			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), std::string("5 string"), double(2), float(3));
+			const char* something = "Something";
+			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), double(2), float(3), "string literal", something );
 			cout << "As constructed: " << mMessage2 << endl;
             mSender.send(mMessage2);
         }

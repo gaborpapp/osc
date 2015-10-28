@@ -274,6 +274,16 @@ void Message::append( const std::string& v )
 	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
 	appendDataBuffer( v.data(), v.size(), trailingZeros );
 }
+	
+void Message::append( const char *v )
+{
+	mIsCached = false;
+	auto stringLength = strlen( v );
+	auto trailingZeros = getTrailingZeros( stringLength );
+	auto size = stringLength + trailingZeros;
+	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
+	appendDataBuffer( v, stringLength, trailingZeros );
+}
 
 void Message::appendBlob( void* blob, uint32_t size )
 {
@@ -284,7 +294,7 @@ void Message::appendBlob( void* blob, uint32_t size )
 	appendDataBuffer( blob, size, trailingZeros );
 }
 
-void Message::appendBlob( const ci::Buffer &buffer )
+void Message::append( const ci::Buffer &buffer )
 {
 	appendBlob( (void*)buffer.getData(), buffer.getSize() );
 }
@@ -537,6 +547,15 @@ std::string Argument::string() const
 	const char* head = reinterpret_cast<const char*>(&mOwner->mDataBuffer[getOffset()]);
 	return std::string( head );
 }
+	
+void Argument::stringData( const char **dataPtr, uint32_t *size ) const
+{
+	if( ! convertible<std::string>() )
+		throw ExcNonConvertible( mOwner->getAddress(), ArgType::STRING, getType() );
+	
+	*dataPtr = reinterpret_cast<const char*>(&mOwner->mDataBuffer[getOffset()]);
+	*size = mSize;
+}
 
 template<typename T>
 bool Argument::convertible() const
@@ -568,7 +587,7 @@ ArgType Message::getArgType( uint32_t index ) const
 	return dataView.getType();
 }
 
-int32_t Message::getArgInt( uint32_t index ) const
+int32_t Message::getArgInt32( uint32_t index ) const
 {
 	auto &dataView = getDataView<int32_t>( index );
 	return dataView.int32();
@@ -584,6 +603,12 @@ std::string Message::getArgString( uint32_t index ) const
 {
 	auto &dataView = getDataView<std::string>( index );
 	return dataView.string();
+}
+	
+void Message::getArgStringData( uint32_t index, const char **dataPtr, uint32_t *size ) const
+{
+	auto &dataView = getDataView<std::string>( index );
+	dataView.stringData( dataPtr, size );
 }
 
 int64_t Message::getArgTime( uint32_t index ) const
