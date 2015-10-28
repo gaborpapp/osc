@@ -85,9 +85,11 @@ void SimpleSenderApp::draw()
 	gl::drawSolidCircle( mCurrentMousePositon, 100 );
 }
 
-CINDER_APP( SimpleSenderApp, RendererGl, []( App::Settings *settings ) {
+auto settingsFunc = []( App::Settings *settings ) {
 #if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
 #endif
 	settings->setMultiTouchEnabled( false );
-})
+};
+
+CINDER_APP( SimpleSenderApp, RendererGl, settingsFunc )

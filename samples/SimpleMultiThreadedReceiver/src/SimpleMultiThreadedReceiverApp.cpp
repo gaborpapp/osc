@@ -88,9 +88,11 @@ void SimpleMultiThreadedReceiverApp::cleanup()
 	mThread.join();
 }
 
-CINDER_APP( SimpleMultiThreadedReceiverApp, RendererGl, []( App::Settings *settings ) {
+auto settingsFunc = []( App::Settings *settings ) {
 #if defined( CINDER_MSW )
 	settings->setConsoleWindowEnabled();
 #endif
 	settings->setMultiTouchEnabled( false );
-})
+};
+
+CINDER_APP( SimpleMultiThreadedReceiverApp, RendererGl, settingsFunc )
