@@ -69,8 +69,8 @@ public:
 	Message() = default;
 	//! Create an OSC message.
 	explicit Message( const std::string& address );
-	Message( const Message & ) = delete;
-	Message& operator=( const Message & ) = delete;
+	Message( const Message & );
+	Message& operator=( const Message & );
 	Message( Message && ) NOEXCEPT;
 	Message& operator=( Message && ) NOEXCEPT;
 	~Message() = default;
@@ -187,8 +187,8 @@ public:
 	public:
 		Argument();
 		Argument( Message *owner, ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
-		Argument( const Argument &arg ) = delete;
-		Argument& operator=( const Argument &arg ) = delete;
+		Argument( const Argument &arg );
+		Argument& operator=( const Argument &arg );
 		Argument( Argument &&arg ) NOEXCEPT;
 		Argument& operator=( Argument &&arg ) NOEXCEPT;
 		

@@ -9,7 +9,7 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-#define TEST_UDP 0
+#define TEST_UDP 1
 
 struct TestStruct {
 	int myInt;
@@ -119,11 +119,11 @@ TestApp::TestApp()
 		cout << "Messages are the same: " << (messagesTheSame ? "true" : "false") << endl;
 	});
     mReceiver.setListener("/message2",
-                          [&]( const osc::Message& message ) {
-                              cout << message << endl;
-                              auto messagesTheSame = (mMessage2 == message);
-                              cout << "Message2 the same: " << std::boolalpha << messagesTheSame << endl;
-                          });
+    [&]( const osc::Message& message ) {
+        cout << message << endl;
+        auto messagesTheSame = (mMessage2 == message);
+        cout << "Message2 the same: " << std::boolalpha << messagesTheSame << endl;
+    });
 }
 
 void TestApp::update()
@@ -171,12 +171,14 @@ void TestApp::update()
         
         {
 			const char* something = "Something";
-			mMessage2 = move( osc::Message( "/message2" ) << 3 << 4 << 2.0 << 3.0f << "string literal" << something );
+			mMessage2 = osc::Message( "/message2" ) << 3 << 4 << 2.0 << 3.0f << "string literal" << something;
 //			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), double(2), float(3), "string literal", something );
 			cout << "As constructed: " << mMessage2 << endl;
             mSender.send(mMessage2);
         }
 	}
+	
+	gl::clear();
 }
 
 #if defined( CINDER_MSW )

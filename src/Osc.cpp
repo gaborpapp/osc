@@ -106,6 +106,31 @@ Message& Message::operator=( Message &&message ) NOEXCEPT
 	return *this;
 }
 	
+Message::Message( const Message &message )
+: mAddress( message.mAddress ), mDataBuffer( message.mDataBuffer ),
+	mDataViews( message.mDataViews ), mIsCached( message.mIsCached ),
+	mCache( mIsCached ? new ByteBuffer( *(message.mCache) ) : nullptr )
+{
+	for( auto & dataView : mDataViews ) {
+		dataView.mOwner = this;
+	}
+}
+	
+Message& Message::operator=( const Message &message )
+{
+	if( this != &message ) {
+		mAddress = message.mAddress;
+		mDataBuffer = message.mDataBuffer;
+		mDataViews = message.mDataViews;
+		mIsCached = message.mIsCached;
+		mCache.reset( mIsCached ? new ByteBuffer( *(message.mCache) ) : nullptr );
+		for( auto & dataView : mDataViews ) {
+			dataView.mOwner = this;
+		}
+	}
+	return *this;
+}
+	
 using Argument = Message::Argument;
 
 Argument::Argument()
@@ -126,6 +151,24 @@ Argument::Argument( Argument &&arg ) NOEXCEPT
 }
 	
 Argument& Argument::operator=( Argument &&arg ) NOEXCEPT
+{
+	if( this != &arg ) {
+		mOwner = arg.mOwner;
+		mType = arg.mType;
+		mOffset = arg.mOffset;
+		mSize = arg.mSize;
+		mNeedsEndianSwapForTransmit = arg.mNeedsEndianSwapForTransmit;
+	}
+	return *this;
+}
+	
+Argument::Argument( const Argument &arg )
+: mOwner( arg.mOwner ), mType( arg.mType ), mOffset( arg.mOffset ),
+mSize( arg.mSize ), mNeedsEndianSwapForTransmit( arg.mNeedsEndianSwapForTransmit )
+{
+}
+
+Argument& Argument::operator=( const Argument &arg )
 {
 	if( this != &arg ) {
 		mOwner = arg.mOwner;
@@ -367,8 +410,8 @@ void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t d
 
 void Message::createCache() const
 {
-	std::string address( mAddress );
-	size_t addressLen = address.size() + getTrailingZeros( address.size() );
+	size_t addressLen = mAddress.size() + getTrailingZeros( mAddress.size() );
+	// TODO: look at getting rid of this copy.
 	std::vector<uint8_t> dataArray( mDataBuffer );
 	// adding one for ',' character, which was the sourc of a particularly ugly bug
 	auto typesSize = mDataViews.size() + 1;
@@ -379,7 +422,7 @@ void Message::createCache() const
 	for( auto & dataView : mDataViews ) {
 		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getType() );
 		if( dataView.needsEndianSwapForTransmit() )
-			dataView.swapEndianForTransmit( reinterpret_cast<uint8_t*>( dataArray.data() ) );
+			dataView.swapEndianForTransmit( dataArray.data() );
 	}
 	
 	if( ! mCache )
