@@ -171,7 +171,8 @@ void TestApp::update()
         
         {
 			const char* something = "Something";
-			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), double(2), float(3), "string literal", something );
+			mMessage2 = move( osc::Message( "/message2" ) << 3 << 4 << 2.0 << 3.0f << "string literal" << something );
+//			mMessage2 = osc::Message("/message2", int64_t(3), int64_t(4), double(2), float(3), "string literal", something );
 			cout << "As constructed: " << mMessage2 << endl;
             mSender.send(mMessage2);
         }

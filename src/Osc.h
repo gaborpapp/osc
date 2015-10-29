@@ -51,7 +51,6 @@ namespace osc {
 enum class ArgType : char { INTEGER_32 = 'i', FLOAT = 'f', DOUBLE = 'd', STRING = 's', BLOB = 'b', MIDI = 'm', TIME_TAG = 't', INTEGER_64 = 'h', BOOL_T = 'T', BOOL_F = 'F', CHAR = 'c', NULL_T = 'N', IMPULSE = 'I', NONE = NULL_T };
 	
 // Forward declarations
-class Message;
 using UdpSocketRef = std::shared_ptr<asio::ip::udp::socket>;
 using TcpSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
 using AcceptorRef = std::shared_ptr<asio::ip::tcp::acceptor>;
@@ -67,19 +66,13 @@ using ByteBufferRef = std::shared_ptr<ByteBuffer>;
 class Message {
 public:
 	
-	//! Create an OSC message.
 	Message() = default;
+	//! Create an OSC message.
 	explicit Message( const std::string& address );
 	Message( const Message & ) = delete;
 	Message& operator=( const Message & ) = delete;
 	Message( Message && ) NOEXCEPT;
 	Message& operator=( Message && ) NOEXCEPT;
-	template <typename... Args>
-	Message(const std::string& address, Args&&... args)
-		: Message(address)
-	{
-		appendArgs(std::forward<Args>(args)...);
-	}
 	~Message() = default;
 	
 	// Functions for appending OSC 1.0 types
@@ -123,43 +116,19 @@ public:
 	// TODO: figure out if array is useful.
 	// void appendArray( void* array, size_t size );
 	
-	template<class T>
-	struct is_c_str
-	: std::integral_constant<
-	bool,
-	std::is_same<char const *, typename std::decay<T>::type>::value ||
-	std::is_same<char *, typename std::decay<T>::type>::value ||
-	std::is_same<char[], typename std::decay<T>::type>::value
-	> {};
+	//! Appends \a arg to the back of the message. Static asserts if Message doesn't know how to
+	//! convert the type.
+	template<typename T>
+	Message& operator<<( T&& arg )
+	{
+		appendArg( std::forward<T>(arg) );
+		return *this;
+	}
 	
-    // Variadic template append function to add multiple args of arbitrary type
-    template <typename T, typename... Args>
-    void appendArgs(T&& t, Args&&... args)
-    {
-		// Accepted types below
-		static_assert(std::is_same<T, int32_t>::value ||
-					  std::is_same<T, int64_t>::value ||
-					  std::is_same<T, std::string>::value ||
-					  std::is_same<T, float>::value ||
-					  std::is_same<T, double>::value ||
-					  std::is_same<T, ci::Buffer>::value ||
-					  std::is_same<T, char>::value ||
-					  std::is_same<T, bool>::value ||
-					  is_c_str<T>::value,
-					  "Unsupported Type in Append Args" );
-        appendArgs(std::forward<T>(t));
-        appendArgs(std::forward<Args>(args)...);
-    }
-    
-    template <typename T>
-    void appendArgs(T&& t)
-    {
-        append(std::forward<T>(t));
-    }
-	
+	//! Returns the type \a T located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
+	//! If argument isn't convertible to this type, throws ExcNonConvertible
 	template <typename T>
-	T getArg( uint32_t index );
-	
+	T			getArg( uint32_t index );
 	//! Returns the int32_t located at \a index. If index is out of bounds, throws ExcIndexOutOfBounds.
 	//! If argument isn't convertible to this type, throws ExcNonConvertible
 	int32_t		getArgInt32( uint32_t index ) const;
@@ -312,9 +281,36 @@ private:
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
 	//! Helper to get current offset into the buffer.
 	size_t getCurrentOffset() { return mDataBuffer.size(); }
-	
+	//! Helper to retrieve the data view of an Argument. Checks the type provided and
+	//! throws ExcNonConvertible if data view cannot convert the type.
 	template<typename T>
 	const Argument& getDataView( uint32_t index ) const;
+	//! Helper type trait definition of a c-string.
+	template<class T>
+	struct is_c_str
+	: std::integral_constant<
+	bool,
+	std::is_same<char const *, typename std::decay<T>::type>::value ||
+	std::is_same<char *, typename std::decay<T>::type>::value ||
+	std::is_same<char[], typename std::decay<T>::type>::value
+	> {};
+	//! Appends \a t to the back of a message. Checks the type against acceptable types
+	//! and static_asserts if the type is acceptable.
+	template <typename T>
+	void appendArg(T&& t)
+	{
+		static_assert(std::is_same<T, int32_t>::value ||
+					  std::is_same<T, int64_t>::value ||
+					  std::is_same<T, std::string>::value ||
+					  std::is_same<T, float>::value ||
+					  std::is_same<T, double>::value ||
+					  std::is_same<T, ci::Buffer>::value ||
+					  std::is_same<T, char>::value ||
+					  std::is_same<T, bool>::value ||
+					  is_c_str<T>::value,
+					  "Unsupported Type in Append Arg" );
+		append(std::forward<T>(t));
+	}
 	
 	//! Helper to to insert data starting at \a begin for \a with resize/fill in the amount
 	//! of \a trailingZeros
