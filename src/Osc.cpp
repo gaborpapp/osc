@@ -871,11 +871,8 @@ std::ostream& operator<<( std::ostream &os, const Argument &rhs )
 //// Bundle
 
 Bundle::Bundle()
-: mDataBuffer( new std::vector<uint8_t>( 20 ) )
 {
-	static std::string id = "#bundle";
-	std::copy( id.begin(), id.end(), mDataBuffer->begin() + 4 );
-	(*mDataBuffer)[19] = 1;
+	initializeBuffer();
 }
 
 void Bundle::setTimetag( uint64_t ntp_time )
@@ -884,6 +881,14 @@ void Bundle::setTimetag( uint64_t ntp_time )
 	ByteArray<8> b;
 	memcpy( b.data(), reinterpret_cast<uint8_t*>( &a ), 8 );
 	mDataBuffer->insert( mDataBuffer->begin() + 12, b.begin(), b.end() );
+}
+	
+void Bundle::initializeBuffer()
+{
+	static std::string id = "#bundle";
+	mDataBuffer.reset( new std::vector<uint8_t>( 20 ) );
+	std::copy( id.begin(), id.end(), mDataBuffer->begin() + 4 );
+	(*mDataBuffer)[19] = 1;
 }
 
 void Bundle::appendData( const ByteBufferRef& data )
@@ -912,19 +917,19 @@ void SenderBase::setSocketTransportErrorFn( SocketTransportErrorFn errorFn )
 //// SenderUdp
 
 SenderUdp::SenderUdp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const protocol &protocol, asio::io_service &service )
-: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
+: SenderBase( nullptr ), mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( udp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
 }
 	
 SenderUdp::SenderUdp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, asio::io_service &service )
-: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
+: SenderBase( nullptr ), mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
 {
 }
 	
 SenderUdp::SenderUdp( const UdpSocketRef &socket, const protocol::endpoint &destination )
-: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
+: SenderBase( nullptr ), mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
 {
 }
 	
@@ -944,8 +949,11 @@ void SenderUdp::sendImpl( const ByteBufferRef &data )
 		if( error ) {
 			// derive oscAddress
 			std::string oscAddress;
-			if( ! data->empty() )
-				oscAddress = std::string( (const char*)(data.get() + 4) );
+			auto foundBegin = find( data->begin(), data->end(), (uint8_t)'/' );
+			if( foundBegin != data->end() ) {
+				auto foundEnd = find( foundBegin, data->end(), 0 );
+				oscAddress = std::string( foundBegin, foundEnd );
+			}
 			
 			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
 			if( mSocketTransportErrorFn ) {
@@ -965,20 +973,20 @@ void SenderUdp::closeImpl()
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderTcp
 
-SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service )
-: mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
+SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, PacketFramingRef packetFraming, const protocol &protocol, io_service &service )
+: SenderBase( packetFraming ), mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( tcp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
 }
 	
-SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, io_service &service )
-: mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
+SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, PacketFramingRef packetFraming, const protocol &protocol, io_service &service )
+: SenderBase( packetFraming ), mSocket( new tcp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
 {
 }
 	
-SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination )
-: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
+SenderTcp::SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination, PacketFramingRef packetFraming )
+: SenderBase( packetFraming ), mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mRemoteEndpoint( destination )
 {
 	
 }
@@ -1000,22 +1008,28 @@ void SenderTcp::connect()
 
 void SenderTcp::sendImpl( const ByteBufferRef &data )
 {
-	mSocket->async_send( asio::buffer( *data ),
+	ByteBufferRef transportData = data;
+	if( mPacketFraming )
+		transportData = mPacketFraming->encode( data );
+	mSocket->async_send( asio::buffer( *transportData ),
 	// copy data pointer to persist the asynchronous send
-	[&, data]( const asio::error_code& error, size_t bytesTransferred )
+	[&, transportData]( const asio::error_code& error, size_t bytesTransferred )
 	{
 		if( error ) {
 			// derive oscAddress
 			std::string oscAddress;
-			if( ! data->empty() )
-				oscAddress = std::string( (const char*)(data.get() + 4) );
-			
-			std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
-			if( mSocketTransportErrorFn ) {
-				mSocketTransportErrorFn( error, oscAddress );
+			auto foundBegin = find( transportData->begin(), transportData->end(), (uint8_t)'/' );
+			if( foundBegin != transportData->end() ) {
+				auto foundEnd = find( foundBegin, transportData->end(), 0 );
+				oscAddress = std::string( foundBegin, foundEnd );
 			}
-			else
-				CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
+			{
+				std::lock_guard<std::mutex> lock( mSocketErrorFnMutex );
+				if( mSocketTransportErrorFn )
+					mSocketTransportErrorFn( error, oscAddress );
+				else
+					CI_LOG_E( error.message() << ", didn't send message [" << oscAddress << "] to " << mRemoteEndpoint.address().to_string() );
+			}
 		}
 	});
 }
@@ -1214,17 +1228,17 @@ bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs 
 //// ReceiverUdp
 	
 ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_service &service )
-: mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, port ), mAmountToReceive( 4096 )
+: ReceiverBase( nullptr ), mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, port ), mAmountToReceive( 4096 )
 {
 }
 
 ReceiverUdp::ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
-: mSocket( new udp::socket( io ) ), mLocalEndpoint( localEndpoint ), mAmountToReceive( 4096 )
+: ReceiverBase( nullptr ), mSocket( new udp::socket( io ) ), mLocalEndpoint( localEndpoint ), mAmountToReceive( 4096 )
 {
 }
 
 ReceiverUdp::ReceiverUdp( UdpSocketRef socket )
-: mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mAmountToReceive( 4096 )
+: ReceiverBase( nullptr ), mSocket( socket ), mLocalEndpoint( socket->local_endpoint() ), mAmountToReceive( 4096 )
 {
 }
 	
@@ -1312,7 +1326,11 @@ std::pair<iterator, bool> ReceiverTcp::Connection::readMatchCondition( iterator 
 
 void ReceiverTcp::Connection::read()
 {
-	asio::async_read_until( *mSocket, mBuffer, &readMatchCondition,
+	std::function<std::pair<iterator, bool>( iterator, iterator )> match = &readMatchCondition;
+	if( mReceiver->mPacketFraming )
+		match = std::bind( &PacketFraming::messageComplete, mReceiver->mPacketFraming,
+						  std::placeholders::_1, std::placeholders::_2 );
+	asio::async_read_until( *mSocket, mBuffer, match,
 	[&]( const asio::error_code &error, size_t bytesTransferred ) {
 		if( error ) {
 			auto remote = getRemoteEndpoint();
@@ -1325,31 +1343,49 @@ void ReceiverTcp::Connection::read()
 			}
 		}
 		else {
-			auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
-			data[ bytesTransferred ] = 0;
+			ByteBufferRef data = ByteBufferRef( new ByteBuffer( bytesTransferred ) );
 			istream stream( &mBuffer );
-			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
+			stream.read( reinterpret_cast<char*>( data->data() ), bytesTransferred );
+			
+			uint8_t *dataPtr = nullptr;
+			size_t dataSize = 0;
+			
+			if( mReceiver->mPacketFraming ) {
+				data = mReceiver->mPacketFraming->decode( data );
+				dataPtr = data->data();
+				dataSize = data->size();
+			}
+			else {
+				dataPtr = data->data() + 4;
+				dataSize = data->size() - 4;
+			}
 			{
 				std::lock_guard<std::mutex> lock( mReceiver->mDispatchMutex );
-				mReceiver->dispatchMethods( (data.get() + 4), bytesTransferred );
+				mReceiver->dispatchMethods( dataPtr, dataSize );
 			}
 		}
-		read();
+		// TODO: Decide if we should handle this.
+		if( error.value() == asio::error::eof ) {
+			CI_LOG_W( "Closing connection: " << getRemoteEndpoint() << ", due to loss of connection" );
+			mReceiver->cleanConnection( this );
+		}
+		else
+			read();
 	});
 }
 
-ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service )
-: mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( protocol, port )
+ReceiverTcp::ReceiverTcp( uint16_t port, PacketFramingRef packetFraming, const protocol &protocol, asio::io_service &service )
+: ReceiverBase( packetFraming ), mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( protocol, port )
 {
 }
 
-ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service )
-: mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( localEndpoint )
+ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, PacketFramingRef packetFraming, asio::io_service &service )
+: ReceiverBase( packetFraming ), mAcceptor( new tcp::acceptor( service ) ), mLocalEndpoint( localEndpoint )
 {
 }
 	
-ReceiverTcp::ReceiverTcp( AcceptorRef acceptor )
-: mAcceptor( acceptor ), mLocalEndpoint( mAcceptor->local_endpoint() )
+ReceiverTcp::ReceiverTcp( AcceptorRef acceptor, PacketFramingRef packetFraming )
+: ReceiverBase( packetFraming ), mAcceptor( acceptor ), mLocalEndpoint( mAcceptor->local_endpoint() )
 {
 }
 	
@@ -1363,6 +1399,12 @@ void ReceiverTcp::setSocketTransportErrorFn( SocketTransportErrorFn<protocol> er
 {
 	std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
 	mSocketTransportErrorFn = errorFn;
+}
+	
+void ReceiverTcp::setOnAcceptFn( OnAcceptFn acceptFn )
+{
+	std::lock_guard<std::mutex> lock( mOnAcceptFnMutex );
+	mOnAcceptFn = acceptFn;
 }
 
 void ReceiverTcp::listenImpl()
@@ -1378,9 +1420,16 @@ void ReceiverTcp::accept()
 	mAcceptor->async_accept( *socket, std::bind(
 	[&]( TcpSocketRef socket, const asio::error_code &error ) {
 		if( ! error ) {
-			std::lock_guard<std::mutex> lock( mConnectionMutex );
-			mConnections.emplace_back( new Connection( socket, this ) );
-			mConnections.back()->read();
+			{
+				std::lock_guard<std::mutex> lock( mOnAcceptFnMutex );
+				if( mOnAcceptFn )
+					mOnAcceptFn( socket );
+			}
+			{
+				std::lock_guard<std::mutex> lock( mConnectionMutex );
+				mConnections.emplace_back( new Connection( socket, this ) );
+				mConnections.back()->read();
+			}
 		}
 		else {
 			std::lock_guard<std::mutex> lock( mSocketTransportErrorFnMutex );
@@ -1390,8 +1439,14 @@ void ReceiverTcp::accept()
 			else
 				CI_LOG_E("Accept: " << error.message());
 		}
-		accept();
+		if( mAcceptor->is_open() )
+			accept();
 	}, socket, _1 ) );
+}
+	
+void ReceiverTcp::closeAcceptor()
+{
+	mAcceptor->close();
 }
 
 void ReceiverTcp::closeImpl()
@@ -1402,6 +1457,100 @@ void ReceiverTcp::closeImpl()
 		connection->close();
 	}
 	mConnections.clear();
+}
+	
+void ReceiverTcp::cleanConnection( Connection *connection )
+{
+	std::lock_guard<std::mutex> lock( mConnectionMutex );
+	mConnections.erase( remove_if( mConnections.begin(), mConnections.end(),
+			  [connection]( const UniqueConnection &cached) {
+				  return cached.get() == connection;
+			  }));
+}
+
+ByteBufferRef SLIPPacketFraming::encode( ByteBufferRef bufferToEncode )
+{
+	// buffers in this system begin with the size, which will be removed in the case of Packet Framing.
+	auto maxEncodedSize = 2 * (bufferToEncode->size() - 4) + 2;
+	auto encodeBuffer = ByteBufferRef( new ByteBuffer( maxEncodedSize ) );
+	auto finalEncodedSize = encode( bufferToEncode->data() + 4, bufferToEncode->size() - 4, encodeBuffer->data() );
+	encodeBuffer->resize( finalEncodedSize );
+	return encodeBuffer;
+}
+
+ByteBufferRef SLIPPacketFraming::decode( ByteBufferRef bufferToDecode )
+{
+	// should not assume double-ENDed variant
+	auto maxDecodedSize = bufferToDecode->size() - 1;
+	auto decodeBuffer = ByteBufferRef( new ByteBuffer( maxDecodedSize ) );
+	auto finalDecodedSize = decode( bufferToDecode->data(), bufferToDecode->size(), decodeBuffer->data() );
+	decodeBuffer->resize( finalDecodedSize );
+	return decodeBuffer;
+}
+	
+std::pair<iterator, bool> SLIPPacketFraming::messageComplete( iterator begin, iterator end )
+{
+	iterator i = begin;
+	while( i != end ) {
+		if( i != begin && (uint8_t)*i == SLIP_END ) {
+			// Send back 1 past finding SLIP_END, which in this case will either
+			// be iterator end or the next SLIP_END, beginning the next message
+			return { i + 1, true };
+		}
+		i++;
+	}
+	return { begin, false };
+}
+
+size_t SLIPPacketFraming::encode( const uint8_t* data, size_t size, uint8_t* encodedData )
+{
+	size_t readIDX = 0, writeIDX = 0;
+	
+	// double-ENDed variant, will flush any accumulated line noise
+	encodedData[writeIDX++] = SLIP_END;
+	
+	while (readIDX < size) {
+		uint8_t value = data[readIDX++];
+		
+		if (value == SLIP_END) {
+			encodedData[writeIDX++] = SLIP_ESC;
+			encodedData[writeIDX++] = SLIP_ESC_END;
+		} else if (value == SLIP_ESC) {
+			encodedData[writeIDX++] = SLIP_ESC;
+			encodedData[writeIDX++] = SLIP_ESC_ESC;
+		} else {
+			encodedData[writeIDX++] = value;
+		}
+	}
+	encodedData[writeIDX++] = SLIP_END;
+	
+	return writeIDX;
+}
+
+size_t SLIPPacketFraming::decode(const uint8_t* data, size_t size, uint8_t* decodedData)
+{
+	size_t readIDX = 0, writeIDX = 0;
+	
+	while (readIDX < size) {
+		uint8_t value = data[readIDX++];
+		
+		if (value == SLIP_END) {
+			// flush or done
+		} else if (value == SLIP_ESC) {
+			value = data[readIDX++];
+			if (value == SLIP_ESC_END) {
+				decodedData[writeIDX++] = SLIP_END;
+			} else if (value == SLIP_ESC_ESC) {
+				decodedData[writeIDX++] = SLIP_ESC;
+			} else {
+				// protocol violation
+			}
+		} else {
+			decodedData[writeIDX++] = value;
+		}
+	}
+	
+	return writeIDX;
 }
 
 namespace time {

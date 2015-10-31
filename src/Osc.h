@@ -338,6 +338,7 @@ private:
 	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	
+public:
 	class ExcIndexOutOfBounds : public ci::Exception {
 	public:
 		ExcIndexOutOfBounds( const std::string &address, uint32_t index )
@@ -356,14 +357,14 @@ private:
 	};
 };
 
-template<> int32_t Message::getArg( uint32_t index ) { return getArgInt32( index ); }
-template<> float Message::getArg( uint32_t index ) { return getArgFloat( index ); }
-template<> std::string Message::getArg( uint32_t index ) { return getArgString( index ); }
-template<> ci::Buffer Message::getArg( uint32_t index ) { return getArgBlob( index ); }
-template<> int64_t Message::getArg( uint32_t index ) { return getArgInt64( index ); }
-template<> double Message::getArg( uint32_t index ) { return getArgDouble( index ); }
-template<> char Message::getArg( uint32_t index ) { return getArgChar( index ); }
-template<> bool Message::getArg( uint32_t index ) { return getArgBool( index ); }
+template<> inline int32_t Message::getArg( uint32_t index ) { return getArgInt32( index ); }
+template<> inline float Message::getArg( uint32_t index ) { return getArgFloat( index ); }
+template<> inline std::string Message::getArg( uint32_t index ) { return getArgString( index ); }
+template<> inline ci::Buffer Message::getArg( uint32_t index ) { return getArgBlob( index ); }
+template<> inline int64_t Message::getArg( uint32_t index ) { return getArgInt64( index ); }
+template<> inline double Message::getArg( uint32_t index ) { return getArgDouble( index ); }
+template<> inline char Message::getArg( uint32_t index ) { return getArgChar( index ); }
+template<> inline bool Message::getArg( uint32_t index ) { return getArgBool( index ); }
 
 //! Convenient stream operator for Message
 std::ostream& operator<<( std::ostream &os, const Message &rhs );
@@ -395,7 +396,7 @@ public:
 	size_t size() const { return mDataBuffer->size(); }
 	
 	//! Clears the bundle.
-	void clear() { mDataBuffer->clear(); }
+	void clear() { initializeBuffer(); }
 	
 private:
 	ByteBufferRef mDataBuffer;
@@ -404,10 +405,32 @@ private:
 	/// convenient for actually sending this OSC bundle.
 	ByteBufferRef getSharedBuffer() const;
 	
+	void initializeBuffer();
+	
 	void appendData( const ByteBufferRef& data );
 	
 	friend class SenderBase;
 	friend class SenderUdp;
+};
+	
+using PacketFramingRef = std::shared_ptr<class PacketFraming>;
+	
+class PacketFraming {
+public:
+	virtual ~PacketFraming() = default;
+	//! Abstract signature to implement the encode process.
+	virtual ByteBufferRef encode( ByteBufferRef bufferToEncode ) = 0;
+	//! Abstract signature to implement the decode process.
+	virtual ByteBufferRef decode( ByteBufferRef bufferToDecode ) = 0;
+	//! Alias representing the iterator type passed the message complete function.
+	using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
+	//! Abstract signature used to implement the read_until message match_condition. For more info on
+	//! the use of this function read about match_condition here...
+	//! http://think-async.com/Asio/asio-1.10.6/doc/asio/reference/async_read_until/overload4.html
+	virtual std::pair<iterator, bool> messageComplete( iterator begin, iterator end ) = 0;
+
+protected:
+	PacketFraming() = default;
 };
 
 //! Represents an OSC Sender (called a \a server in the OSC spec) and implements a unified
@@ -434,7 +457,9 @@ public:
 	void setSocketTransportErrorFn( SocketTransportErrorFn errorFn );
 	
 protected:
-	SenderBase() = default;
+	SenderBase( PacketFramingRef packetFraming )
+	: mPacketFraming( packetFraming ) {}
+	
 	virtual ~SenderBase() = default;
 	SenderBase( const SenderBase &other ) = delete;
 	SenderBase& operator=( const SenderBase &other ) = delete;
@@ -450,6 +475,7 @@ protected:
 	
 	SocketTransportErrorFn	mSocketTransportErrorFn;
 	std::mutex				mSocketErrorFnMutex;
+	PacketFramingRef		mPacketFraming;
 };
 	
 //! Represents an OSC Sender (called a \a server in the OSC spec) and implements the UDP
@@ -518,6 +544,7 @@ public:
 	SenderTcp( uint16_t localPort,
 			   const std::string &destinationHost,
 			   uint16_t destinationPort,
+			   PacketFramingRef packetFraming = nullptr,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
 	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, whose local endpoint is
@@ -525,13 +552,15 @@ public:
 	//! destination. Takes an optional io_service to construct the socket from.
 	SenderTcp( uint16_t localPort,
 			   const protocol::endpoint &destination,
+			   PacketFramingRef packetFraming = nullptr,
 			   const protocol &protocol = protocol::v4(),
 			   asio::io_service &service = ci::app::App::get()->io_service() );
 	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, with an already created
 	//! tcp::socket shared_ptr \a socket and remote endpoint \a destination. This constructor is good for using
 	//! already constructed sockets for more indepth configuration. Expects the local endpoint is already
 	//! constructed.
-	SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination );
+	SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination,
+			   PacketFramingRef packetFraming = nullptr );
 	virtual ~SenderTcp() = default;
 	
 	//! Connects to the remote endpoint using the underlying socket. Has to be called before attempting to send anything.
@@ -572,7 +601,7 @@ public:
 	//! asio's error_codes, look at "asio/error.hpp".
 	template<typename Protocol>
 	using SocketTransportErrorFn = std::function<void( const asio::error_code &/*error*/,
-												   const typename Protocol::endpoint &/*originator*/)>;
+													   const typename Protocol::endpoint &/*originator*/)>;
 	//! Alias function representing a message callback.
 	using ListenerFn = std::function<void( const Message &message )>;
 	//! Alias container for callbacks.
@@ -591,7 +620,7 @@ public:
 	void		removeListener( const std::string &address );
 	
 protected:
-	ReceiverBase() = default;
+	ReceiverBase( PacketFramingRef packetFraming ) : mPacketFraming( packetFraming ) {}
 	virtual ~ReceiverBase() = default;
 	//! Non-copyable.
 	ReceiverBase( const ReceiverBase &other ) = delete;
@@ -619,8 +648,9 @@ protected:
 	//! Abstract close implementation function.
 	virtual void closeImpl() = 0;
 	
-	Listeners				mListeners;
-	std::mutex				mListenerMutex, mSocketTransportErrorFnMutex;
+	Listeners			mListeners;
+	std::mutex			mListenerMutex, mSocketTransportErrorFnMutex;
+	PacketFramingRef	mPacketFraming;
 };
 	
 //! Represents an OSC Receiver(called a \a client in the OSC spec) and implements the UDP transport
@@ -685,25 +715,35 @@ public:
 class ReceiverTcp : public ReceiverBase {
 public:
 	using protocol = asio::ip::tcp;
+	using OnAcceptFn = std::function<void( TcpSocketRef )>;
 	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, whose local endpoint
 	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
 	//! construct the socket from.
 	ReceiverTcp( uint16_t port,
+				 PacketFramingRef packetFraming = nullptr,
 				 const protocol &protocol = protocol::v4(),
-				 asio::io_service &service = ci::app::App::get()->io_service()  );
+				 asio::io_service &service = ci::app::App::get()->io_service() );
 	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, whose local endpoint
 	//! is defined by \a localEndpoint. Takes an optional io_service to construct the socket from.
 	ReceiverTcp( const protocol::endpoint &localEndpoint,
-				 asio::io_service &service = ci::app::App::get()->io_service() );
+				 PacketFramingRef packetFraming = nullptr,
+			 	 asio::io_service &service = ci::app::App::get()->io_service() );
 	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, from the already
 	//! constructed tcp::acceptor shared_ptr \a socket. Use this for extra configuration.
-	ReceiverTcp( AcceptorRef acceptor );
+	ReceiverTcp( AcceptorRef acceptor,
+				 PacketFramingRef packetFraming = nullptr );
 	virtual ~ReceiverTcp() = default;
 	
 	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
 	void setSocketTransportErrorFn( SocketTransportErrorFn<protocol> errorFn );
+	//! Sets the underlying OnAcceptFn. Called when the Acceptor receives a connection and before the
+	//! ReceiverTcp::Connection is constructed and read from.
+	void setOnAcceptFn( OnAcceptFn acceptFn );
+	//! Closes acceptor. Must rebind to listen again after calling this function.
+	void closeAcceptor();
 	
 protected:
+	//! Handles reading from the socket.
 	struct Connection {
 		Connection( TcpSocketRef socket, ReceiverTcp* transport );
 		
@@ -746,13 +786,16 @@ protected:
 	void accept();
 	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
+	//! TODO: See if this is safe. Removes a connection from the vector of connections.
+	void cleanConnection( Connection *connection );
 	
 	AcceptorRef			mAcceptor;
 	protocol::endpoint	mLocalEndpoint;
 	
 	SocketTransportErrorFn<protocol>	mSocketTransportErrorFn;
+	OnAcceptFn							mOnAcceptFn;
 	
-	std::mutex							mDispatchMutex, mConnectionMutex;
+	std::mutex							mDispatchMutex, mConnectionMutex, mOnAcceptFnMutex;
 	
 	using UniqueConnection = std::unique_ptr<Connection>;
 	std::vector<UniqueConnection>			mConnections;
@@ -767,6 +810,32 @@ public:
 	ReceiverTcp( ReceiverTcp &&other ) = delete;
 	//! Non-Moveable.
 	ReceiverTcp& operator=( ReceiverTcp &&other ) = delete;
+};
+	
+//! Implements the SLIP encode and decode process for Stream Packet Framing. This is the recommended
+//! standard for the OSC 1.1 specification. Code contribution from https://github.com/pizthewiz/Cinder-Encoding.
+class SLIPPacketFraming : public PacketFraming {
+public:
+	SLIPPacketFraming() = default;
+	virtual ~SLIPPacketFraming() = default;
+	//! SLIP encodes \a bufferToEncode returning the encoded ByteBufferRef.
+	ByteBufferRef encode( ByteBufferRef bufferToEncode ) override;
+	//! SLIP decodes \a bufferToDecode returning the decoded ByteBufferRef.
+	ByteBufferRef decode( ByteBufferRef bufferToDecode ) override;
+	//! Message Match condition for SLIP encoding.
+	std::pair<iterator, bool> messageComplete( iterator begin, iterator end ) override;
+	
+	//! Const values used in the SLIP encoding/decoding process.
+	static const uint8_t SLIP_END = 0xC0;
+	static const uint8_t SLIP_ESC = 0xDB;
+	static const uint8_t SLIP_ESC_END = 0xDC;
+	static const uint8_t SLIP_ESC_ESC = 0xDD;
+	
+protected:
+	//! Implements the encoding process.
+	size_t encode( const uint8_t* data, size_t size, uint8_t* encodedData );
+	//! Implements the decoding process.
+	size_t decode( const uint8_t* data, size_t size, uint8_t* decodedData );
 };
 
 namespace time {
