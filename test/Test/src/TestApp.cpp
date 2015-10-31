@@ -9,7 +9,9 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-#define TEST_UDP 1
+#define TEST_UDP 0
+
+#define USE_SLIP_PACKET_FRAMING 0
 
 struct TestStruct {
 	int myInt;
@@ -22,12 +24,15 @@ class TestApp : public App {
 	TestApp();
 	void update() override;
 	
-#if defined TEST_UDP
+#if TEST_UDP
 	void sendMessageUdp( const osc::Message &message );
 	osc::ReceiverUdp	mReceiver;
 	osc::SenderUdp		mSender;
 #else
 	void sendMessageTcp( const osc::Message &message );
+	
+	osc::PacketFramingRef mPacketFraming;
+	
 	osc::ReceiverTcp	mReceiver;
 	osc::SenderTcp		mSender;
 #endif
@@ -39,7 +44,15 @@ class TestApp : public App {
 };
 
 TestApp::TestApp()
+#if TEST_UDP
 : App(), mReceiver( 10000 ), mSender( 12345, "127.0.0.1", 10000 )
+#else
+: App(),
+#if USE_SLIP_PACKET_FRAMING
+	mPacketFraming( new osc::SLIPPacketFraming ),
+#endif
+	mReceiver( 10000, mPacketFraming ), mSender( 12345, "127.0.0.1", 10000, mPacketFraming )
+#endif
 {	
 	mReceiver.bind();
 	mReceiver.listen();
@@ -130,7 +143,7 @@ void TestApp::update()
 {
 	if( ! mIsConnected ) {
 		mSender.bind();
-#if ! defined TEST_UDP
+#if ! TEST_UDP
 		mSender.connect();
 #endif
 		mIsConnected = true;
