@@ -113,8 +113,6 @@ public:
 	void append( char v );
 	//! Appends a midi value to the back of the message.
 	void appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t data2 );
-	// TODO: figure out if array is useful.
-	// void appendArray( void* array, size_t size );
 	
 	//! Appends \a arg to the back of the message. Static asserts if Message doesn't know how to
 	//! convert the type.

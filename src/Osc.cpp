@@ -399,20 +399,13 @@ void Message::appendMidi( uint8_t port, uint8_t status, uint8_t data1, uint8_t d
 	appendDataBuffer( b.data(), b.size() );
 }
 
-//void Message::appendArray( void* array, size_t size )
-//{
-//	if( !array || size == 0 ) return;
-//	mIsCached = false;
-//	mTypesArray.push_back( '[' );
-//	mTypesArray.insert( mTypesArray.end(), (uint8_t*) &array, (uint8_t*) &array + size );
-//	mTypesArray.push_back( ']' );
-//}
-
 void Message::createCache() const
 {
+	// Check for debug to allow for Default Constructing.
+	CI_ASSERT_MSG( mAddress.size() > 0 && mAddress[0] == '/',
+				  "All OSC Address Patterns must at least start with '/' (forward slash)" );
+	
 	size_t addressLen = mAddress.size() + getTrailingZeros( mAddress.size() );
-	// TODO: look at getting rid of this copy.
-	std::vector<uint8_t> dataArray( mDataBuffer );
 	// adding one for ',' character, which was the sourc of a particularly ugly bug
 	auto typesSize = mDataViews.size() + 1;
 	std::vector<char> typesArray( typesSize + getTrailingZeros( typesSize ) , 0 );
@@ -421,8 +414,6 @@ void Message::createCache() const
 	int i = 1;
 	for( auto & dataView : mDataViews ) {
 		typesArray[i++] = Argument::translateArgTypeToChar( dataView.getType() );
-		if( dataView.needsEndianSwapForTransmit() )
-			dataView.swapEndianForTransmit( dataArray.data() );
 	}
 	
 	if( ! mCache )
@@ -439,7 +430,14 @@ void Message::createCache() const
 	std::copy( sizeArray.begin(),	sizeArray.end(),	mCache->begin() );
 	std::copy( mAddress.begin(),	mAddress.end(),		mCache->begin() + 4 );
 	std::copy( typesArray.begin(),	typesArray.end(),	mCache->begin() + 4 + addressLen );
-	std::copy( dataArray.begin(),	dataArray.end(),	mCache->begin() + 4 + addressLen + typesArrayLen );
+	std::copy( mDataBuffer.begin(),	mDataBuffer.end(),	mCache->begin() + 4 + addressLen + typesArrayLen );
+	
+	// Now that cached (transportable) buffer is created, swap endian for transmit.
+	for( auto & dataView : mDataViews ) {
+		if( dataView.needsEndianSwapForTransmit() )
+			dataView.swapEndianForTransmit( (mCache->data() + 4 + addressLen + typesArrayLen) );
+	}
+	
 	mIsCached = true;
 }
 
