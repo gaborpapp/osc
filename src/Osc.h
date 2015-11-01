@@ -470,6 +470,8 @@ protected:
 	virtual void closeImpl() = 0;
 	//! Abstract bind function implemented by the network layer
 	virtual void bindImpl() = 0;
+	//! Handles error
+	virtual void handleError( const asio::error_code &error, const std::string &oscAddress);
 	
 	SocketTransportErrorFn	mSocketTransportErrorFn;
 	std::mutex				mSocketErrorFnMutex;
@@ -575,7 +577,7 @@ protected:
 	//! Sends the byte buffer /a data to the remote endpoint using the TCP socket, asynchronously.
 	void sendImpl( const ByteBufferRef &data ) override;
 	//! Closes the underlying TCP socket.
-	void closeImpl() override { mSocket->close(); }
+	void closeImpl() override;
 	
 	TcpSocketRef			mSocket;
 	asio::ip::tcp::endpoint mLocalEndpoint, mRemoteEndpoint;
@@ -689,6 +691,8 @@ protected:
 	//! Closes the underlying UDP socket.
 	void closeImpl() override { mSocket->close(); }
 	
+	void handleError( const asio::error_code &error, const protocol::endpoint &originator );
+	
 	UdpSocketRef						mSocket;
 	asio::ip::udp::endpoint				mLocalEndpoint;
 	asio::streambuf						mBuffer;
@@ -786,6 +790,8 @@ protected:
 	void closeImpl() override;
 	//! TODO: See if this is safe. Removes a connection from the vector of connections.
 	void cleanConnection( Connection *connection );
+	
+	void handleError( const asio::error_code &error, const protocol::endpoint &originator );
 	
 	AcceptorRef			mAcceptor;
 	protocol::endpoint	mLocalEndpoint;
