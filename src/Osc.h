@@ -64,7 +64,7 @@ using ByteBufferRef = std::shared_ptr<ByteBuffer>;
 /// Control 1.0 and 1.1 specifications and extra non-standard arguments listed
 /// in http://opensoundcontrol.org/spec-1_0.
 class Message {
-public:
+  public:
 	
 	Message() = default;
 	//! Create an OSC message.
@@ -182,7 +182,7 @@ public:
 	void clear();
 	
 	class Argument {
-	public:
+	  public:
 		Argument();
 		Argument( Message *owner, ArgType type, int32_t offset, uint32_t size, bool needsSwap = false );
 		Argument( const Argument &arg );
@@ -240,7 +240,7 @@ public:
 		//! Converts ArgType \a type to c-string for debug purposes.
 		static const char* argTypeToString( ArgType type );
 		
-	private:
+	  private:
 		//! Simple helper to stream a message's contents to the console.
 		void		outputValueToStream( std::ostream &ostream ) const;
 		//! Returns true, if before transporting this message, this argument needs a big endian swap
@@ -274,7 +274,7 @@ public:
 	//! Evaluates the inequality of this with \a other
 	bool			operator!=( const Message &other ) const;
 	
-private:
+  private:
 	//! Helper to calculate how many zeros to buffer to create a 4 byte
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
 	//! Helper to get current offset into the buffer.
@@ -336,7 +336,7 @@ private:
 	friend class ReceiverBase;
 	friend std::ostream& operator<<( std::ostream &os, const Message &rhs );
 	
-public:
+  public:
 	class ExcIndexOutOfBounds : public ci::Exception {
 	public:
 		ExcIndexOutOfBounds( const std::string &address, uint32_t index )
@@ -371,7 +371,7 @@ std::ostream& operator<<( std::ostream &os, const Message::Argument &rhs );
 //! Represents an Open Sound Control bundle message. A bundle can contains any number
 //! of Messages and Bundles.
 class Bundle {
-public:
+  public:
 	
 	//! Creates a OSC bundle with timestamp set to immediate. Call set_timetag to
 	//! set a custom timestamp.
@@ -396,7 +396,7 @@ public:
 	//! Clears the bundle.
 	void clear() { initializeBuffer(); }
 	
-private:
+  private:
 	ByteBufferRef mDataBuffer;
 	
 	/// Returns a pointer to the byte array of this OSC bundle. This call is
@@ -414,7 +414,7 @@ private:
 using PacketFramingRef = std::shared_ptr<class PacketFraming>;
 	
 class PacketFraming {
-public:
+  public:
 	virtual ~PacketFraming() = default;
 	//! Abstract signature to implement the encode process.
 	virtual ByteBufferRef encode( ByteBufferRef bufferToEncode ) = 0;
@@ -427,14 +427,14 @@ public:
 	//! http://think-async.com/Asio/asio-1.10.6/doc/asio/reference/async_read_until/overload4.html
 	virtual std::pair<iterator, bool> messageComplete( iterator begin, iterator end ) = 0;
 
-protected:
+  protected:
 	PacketFraming() = default;
 };
 
 //! Represents an OSC Sender (called a \a server in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class SenderBase {
-public:
+  public:
 	//! Alias function that represents a general error callback for the socket. Note: for some errors
 	//! there'll not be an accompanying oscAddress, or it'll not have a value set. These errors have
 	//! nothing to do with transport but other socket operations like bind and open. To see more about
@@ -454,7 +454,7 @@ public:
 	//! Sets the underlying socket transport error fn with \a errorFn.
 	void setSocketTransportErrorFn( SocketTransportErrorFn errorFn );
 	
-protected:
+  protected:
 	SenderBase( PacketFramingRef packetFraming )
 	: mPacketFraming( packetFraming ) {}
 	
@@ -466,6 +466,8 @@ protected:
 	
 	//! Abstract send function implemented by the network layer.
 	virtual void sendImpl( const ByteBufferRef &byteBuffer ) = 0;
+	//!
+	std::string extractOscAddress( const ByteBufferRef &transportData );
 	//! Abstract close function implemented by the network layer
 	virtual void closeImpl() = 0;
 	//! Abstract bind function implemented by the network layer
@@ -481,7 +483,7 @@ protected:
 //! Represents an OSC Sender (called a \a server in the OSC spec) and implements the UDP
 //! transport networking layer.
 class SenderUdp : public SenderBase {
-public:
+  public:
 	//! Alias protocol for cleaner interfaces
 	using protocol = asio::ip::udp;
 	//! Constructs a Sender (called a \a server in the OSC spec) using UDP as transport, whose local endpoint is
@@ -511,7 +513,7 @@ public:
 	//! Returns the remote address of the endpoint associated with this transport.
 	const protocol::endpoint& getRemoteAddress() const { return mRemoteEndpoint; }
 	
-protected:
+  protected:
 	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
 	//! Sends the byte buffer /a data to the remote endpoint using the UDP socket, asynchronously.
@@ -522,7 +524,7 @@ protected:
 	UdpSocketRef			mSocket;
 	protocol::endpoint		mLocalEndpoint, mRemoteEndpoint;
 	
-public:
+  public:
 	//! Non-copyable.
 	SenderUdp( const SenderUdp &other ) = delete;
 	//! Non-copyable.
@@ -536,8 +538,9 @@ public:
 //! Represents an OSC Sender (called a \a server in the OSC spec) and implements the TCP
 //! transport networking layer.
 class SenderTcp : public SenderBase {
-public:
+  public:
 	using protocol = asio::ip::tcp;
+	using OnConnectFn = std::function<void( TcpSocketRef )>;
 	//! Constructs a Sender (called a \a server in the OSC spec) using TCP as transport, whose local endpoint is
 	//! defined by \a localPort and \a protocol, which defaults to v4, and remote endpoint is defined by \a
 	//! destinationHost and \a destinationPort. Takes an optional io_service to construct the socket from.
@@ -559,7 +562,8 @@ public:
 	//! tcp::socket shared_ptr \a socket and remote endpoint \a destination. This constructor is good for using
 	//! already constructed sockets for more indepth configuration. Expects the local endpoint is already
 	//! constructed.
-	SenderTcp( const TcpSocketRef &socket, const protocol::endpoint &destination,
+	SenderTcp( const TcpSocketRef &socket,
+			  /*already cached*/ const protocol::endpoint &destination,
 			   PacketFramingRef packetFraming = nullptr );
 	virtual ~SenderTcp() = default;
 	
@@ -571,7 +575,9 @@ public:
 	//! Returns the remote address of the endpoint associated with this transport.
 	const protocol::endpoint& getRemoteEndpoint() const { return mRemoteEndpoint; }
 	
-protected:
+	void setOnConnectFn( OnConnectFn onConnectFn );
+
+  protected:
 	//! Opens and Binds the underlying TCP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
 	//! Sends the byte buffer /a data to the remote endpoint using the TCP socket, asynchronously.
@@ -581,8 +587,10 @@ protected:
 	
 	TcpSocketRef			mSocket;
 	asio::ip::tcp::endpoint mLocalEndpoint, mRemoteEndpoint;
+	OnConnectFn				mOnConnectFn;
+	std::mutex				mOnConnectFnMutex;
 	
-public:
+  public:
 	//! Non-copyable.
 	SenderTcp( const SenderTcp &other ) = delete;
 	//! Non-copyable.
@@ -596,12 +604,7 @@ public:
 //! Represents an OSC Receiver(called a \a client in the OSC spec) and implements a unified
 //! interface without implementing any of the networking layer.
 class ReceiverBase {
-public:
-	//! Alias function that represents a transport error function. To see more about
-	//! asio's error_codes, look at "asio/error.hpp".
-	template<typename Protocol>
-	using SocketTransportErrorFn = std::function<void( const asio::error_code &/*error*/,
-													   const typename Protocol::endpoint &/*originator*/)>;
+  public:
 	//! Alias function representing a message callback.
 	using ListenerFn = std::function<void( const Message &message )>;
 	//! Alias container for callbacks.
@@ -619,7 +622,7 @@ public:
 	//! Removes the listener associated with \a address.
 	void		removeListener( const std::string &address );
 	
-protected:
+  protected:
 	ReceiverBase( PacketFramingRef packetFraming ) : mPacketFraming( packetFraming ) {}
 	virtual ~ReceiverBase() = default;
 	//! Non-copyable.
@@ -633,7 +636,6 @@ protected:
 	
 	//! decodes and routes messages from the networking layers stream.
 	void dispatchMethods( uint8_t *data, uint32_t size );
-	
 	//! Decodes a complete OSC Packet into it's individual parts.
 	bool decodeData( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 ) const;
 	//! Decodes an individual message.
@@ -656,8 +658,12 @@ protected:
 //! Represents an OSC Receiver(called a \a client in the OSC spec) and implements the UDP transport
 //!	networking layer.
 class ReceiverUdp : public ReceiverBase {
-public:
+  public:
 	using protocol = asio::ip::udp;
+	//! Alias function that represents a transport error function. To see more about
+	//! asio's error_codes, look at "asio/error.hpp".
+	using SocketTransportErrorFn = std::function<void( const asio::error_code &/*error*/,
+													   const protocol::endpoint &/*originator*/)>;
 	//! Constructs a Receiver (called a \a client in the OSC spec) using UDP for transport, whose local endpoint
 	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
 	//! construct the socket from.
@@ -681,9 +687,9 @@ public:
 	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
 	
 	//! Sets the underlying SocketTransportErrorFn based on the asio::ip::tcp protocol.
-	void setSocketErrorFn( SocketTransportErrorFn<protocol> errorFn );
+	void setSocketErrorFn( SocketTransportErrorFn errorFn );
 	
-protected:
+  protected:
 	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively.
 	void bindImpl() override;
 	//! Listens on the UDP network socket for incoming datagrams. Handles the async receive completion operations. Any errors from asio are handled internally.
@@ -697,11 +703,11 @@ protected:
 	asio::ip::udp::endpoint				mLocalEndpoint;
 	asio::streambuf						mBuffer;
 	
-	SocketTransportErrorFn<protocol>	mSocketTransportErrorFn;
+	SocketTransportErrorFn				mSocketTransportErrorFn;
 	
 	uint32_t							mAmountToReceive;
 	
-public:
+  public:
 	//! Non-copyable.
 	ReceiverUdp( const ReceiverUdp &other ) = delete;
 	//! Non-copyable.
@@ -715,9 +721,14 @@ public:
 //! Represents an OSC Receiver(called a \a client in the OSC spec) and implements the TCP
 //! transport networking layer.
 class ReceiverTcp : public ReceiverBase {
-public:
+  public:
 	using protocol = asio::ip::tcp;
-	using OnAcceptFn = std::function<void( TcpSocketRef )>;
+	//! Alias function that represents a transport error function. To see more about
+	//! asio's error_codes, look at "asio/error.hpp".
+	using SocketTransportErrorFn = std::function<void( const asio::error_code &/*error*/,
+													   uint64_t /*connectionIdentifier*/ )>;
+	using AcceptorErrorFn = std::function<void( const asio::error_code &/*error*/ )>;
+	using OnAcceptFn = std::function<void( TcpSocketRef, uint64_t )>;
 	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, whose local endpoint
 	//! is defined by \a localPort and \a protocol, which defaults to v4. Takes an optional io_service to
 	//! construct the socket from.
@@ -731,42 +742,45 @@ public:
 				 PacketFramingRef packetFraming = nullptr,
 			 	 asio::io_service &service = ci::app::App::get()->io_service() );
 	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, from the already
-	//! constructed tcp::acceptor shared_ptr \a socket. Use this for extra configuration.
+	//! constructed tcp::acceptor shared_ptr \a acceptor. Use this for extra configuration.
 	ReceiverTcp( AcceptorRef acceptor,
+				 PacketFramingRef packetFraming = nullptr );
+	//! Constructs a Receiver (called a \a client in the OSC spec) using TCP for transport, from the already
+	//! constructed tcp::socket shared_ptr \a connection. Advanced use only.
+	ReceiverTcp( TcpSocketRef connection,
 				 PacketFramingRef packetFraming = nullptr );
 	virtual ~ReceiverTcp() = default;
 	
-	//! Sets the underlying SocketTransportErrorFn based on the asio::io::tcp protocol.
-	void setSocketTransportErrorFn( SocketTransportErrorFn<protocol> errorFn );
+	//! Sets the underlying SocketTransportErrorFn based on the asio::ip::tcp protocol.
+	void setSocketTransportErrorFn( SocketTransportErrorFn errorFn );
+	//! Sets the underlying AcceptorErrorFn, called on any errors happening on the underlying acceptor.
+	void setAcceptorErrorFn( AcceptorErrorFn errorFn );
 	//! Sets the underlying OnAcceptFn. Called when the Acceptor receives a connection and before the
 	//! ReceiverTcp::Connection is constructed and read from.
 	void setOnAcceptFn( OnAcceptFn acceptFn );
 	//! Closes acceptor. Must rebind to listen again after calling this function.
 	void closeAcceptor();
+	//!
+	void closeConnection( uint64_t connectionIdentifier );
 	
-protected:
+  protected:
 	//! Handles reading from the socket.
 	struct Connection {
-		Connection( TcpSocketRef socket, ReceiverTcp* transport );
-		
+		Connection( TcpSocketRef socket, ReceiverTcp* transport, uint64_t identifier );
 		~Connection();
 		
-		protocol::endpoint getRemoteEndpoint() { return mSocket->remote_endpoint(); }
-		protocol::endpoint getLocalEndpoint() { return  mSocket->local_endpoint(); }
-		
-		//! Implements the read on the underlying socket. Handles the async receive completion operations. Any errors from asio are handled internally.
+		//! Implements the read on the underlying socket. Handles the async receive completion operations.
 		void read();
 		//! Simple alias for asio buffer iterator type.
 		using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
 		//! Static method which is used to read the stream as it's coming in and notate each packet.
 		static std::pair<iterator, bool> readMatchCondition( iterator begin, iterator end );
-		//! Implements the close of this socket
-		void close();
 		
 		TcpSocketRef			mSocket;
 		ReceiverTcp*			mReceiver;
 		asio::streambuf			mBuffer;
-		std::vector<uint8_t>	mDataBuffer;
+		
+		const uint64_t			mIdentifier;
 		
 		//! Non-copyable.
 		Connection( const Connection &other ) = delete;
@@ -788,24 +802,26 @@ protected:
 	void accept();
 	//! Implements the close operation for the underlying sockets and acceptor.
 	void closeImpl() override;
-	//! TODO: See if this is safe. Removes a connection from the vector of connections.
-	void cleanConnection( Connection *connection );
 	
-	void handleError( const asio::error_code &error, const protocol::endpoint &originator );
+	void handleAcceptorError( const asio::error_code &error );
+	void handleSocketError( const asio::error_code &error, uint64_t originator, const asio::ip::tcp::endpoint &endpoint );
 	
 	AcceptorRef			mAcceptor;
 	protocol::endpoint	mLocalEndpoint;
 	
-	SocketTransportErrorFn<protocol>	mSocketTransportErrorFn;
+	SocketTransportErrorFn				mSocketTransportErrorFn;
+	AcceptorErrorFn						mAcceptorErrorFn;
 	OnAcceptFn							mOnAcceptFn;
 	
-	std::mutex							mDispatchMutex, mConnectionMutex, mOnAcceptFnMutex;
+	std::mutex							mDispatchMutex, mConnectionMutex,
+										mOnAcceptFnMutex, mAcceptorErrorFnMutex;
 	
 	using UniqueConnection = std::unique_ptr<Connection>;
-	std::vector<UniqueConnection>			mConnections;
+	std::vector<UniqueConnection>		mConnections;
+	uint64_t							mConnectionIdentifiers;
 
 	friend struct Connection;
-public:
+  public:
 	//! Non-copyable.
 	ReceiverTcp( const ReceiverTcp &other ) = delete;
 	//! Non-copyable.
@@ -819,7 +835,7 @@ public:
 //! Implements the SLIP encode and decode process for Stream Packet Framing. This is the recommended
 //! standard for the OSC 1.1 specification. Code contribution from https://github.com/pizthewiz/Cinder-Encoding.
 class SLIPPacketFraming : public PacketFraming {
-public:
+  public:
 	SLIPPacketFraming() = default;
 	virtual ~SLIPPacketFraming() = default;
 	//! SLIP encodes \a bufferToEncode returning the encoded ByteBufferRef.
@@ -835,7 +851,7 @@ public:
 	static const uint8_t SLIP_ESC_END = 0xDC;
 	static const uint8_t SLIP_ESC_ESC = 0xDD;
 	
-protected:
+  protected:
 	//! Implements the encoding process.
 	size_t encode( const uint8_t* data, size_t size, uint8_t* encodedData );
 	//! Implements the decoding process.
