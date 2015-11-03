@@ -1,0 +1,8 @@
+env = Environment()
+
+env['APP_TARGET'] = 'BroadcastSenderApp'
+env['APP_SOURCES'] = ['BroadcastSenderApp.cpp']
+
+env = SConscript('../../../scons/SConscript', exports = 'env')
+
+SConscript('../../../../../scons/SConscript', exports = 'env')
